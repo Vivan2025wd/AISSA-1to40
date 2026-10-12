@@ -410,7 +410,7 @@ export default function QuizQuestionsPage() {
 
       {/* ============ Toast ============ */}
       {toast && (
-        <div className="pointer-events-none fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-2xl ring-1 ring-white/10">
+        <div className="pointer-events-none fixed bottom-6 left-1/2 z-60 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-2xl ring-1 ring-white/10">
           <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           {toast}
         </div>
