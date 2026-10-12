@@ -13,9 +13,16 @@ import {
   ChevronRight,
   CheckCircle2,
   PlayCircle,
+  BookOpen,
+  Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { formatCountdown, getQuizWindow } from "@/lib/quiz-window";
+
+/* ------------------------------------------------------------------ */
+/*  Types (mirror the RPC response — unchanged)                       */
+/* ------------------------------------------------------------------ */
 
 interface DashboardData {
   profile: { id: string; full_name: string; email: string; school: string };
@@ -45,6 +52,10 @@ interface DashboardData {
   }[];
 }
 
+/* ------------------------------------------------------------------ */
+/*  Page                                                              */
+/* ------------------------------------------------------------------ */
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,68 +74,69 @@ export default function DashboardPage() {
     })();
   }, []);
 
-  if (loading) return <CenterSpinner label="පූරණය වෙමින්..." />;
+  if (loading) return <CenterSpinner label="Loading dashboard…" />;
   if (error) return <CenterError message={error} />;
   if (!data) return null;
 
-  const firstName = data.profile.full_name.split(" ")[0] || "සිසු";
+  const firstName = data.profile.full_name.split(" ")[0] || "there";
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-      {/* Greeting */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-          ආයුබෝවන්, {firstName} 👋
+      {/* ============ Greeting ============ */}
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+          Hi, {firstName} 👋
         </h1>
-        <p className="mt-1 text-sm text-slate-600">{data.profile.school}</p>
-      </div>
+        <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+          <BookOpen className="h-3.5 w-3.5" />
+          {data.profile.school || "Sri Lanka"}
+        </p>
+      </header>
 
-      {/* Stats */}
+      {/* ============ Stats ============ */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         <StatCard
           icon={<ClipboardList className="h-5 w-5" />}
-          label="විභාග"
-          en="Exams taken"
+          label="Exams taken"
           value={data.stats.total_exams.toString()}
-          accent="blue"
+          accent="sky"
         />
         <StatCard
           icon={<Target className="h-5 w-5" />}
-          label="සාමාන්‍ය"
-          en="Average"
+          label="Average"
           value={`${data.stats.avg_pct}%`}
-          accent="green"
+          accent="emerald"
         />
         <StatCard
           icon={<TrendingUp className="h-5 w-5" />}
-          label="හොඳම"
-          en="Best"
+          label="Best score"
           value={`${data.stats.best_pct}%`}
           accent="amber"
         />
         <StatCard
           icon={<Trophy className="h-5 w-5" />}
-          label="දිවයිනේ ස්ථානය"
-          en="Island rank"
+          label="Island rank"
           value={data.stats.island_rank ? `#${data.stats.island_rank}` : "—"}
-          accent="purple"
+          accent="violet"
         />
       </div>
 
-      {/* Quizzes */}
-      <section className="mt-8">
+      {/* ============ Quizzes ============ */}
+      <section className="mt-8 sm:mt-10">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">ප්‍රශ්නාවලි</h2>
-          <span className="text-xs text-slate-500">
-            {data.live_quizzes.length} available
-          </span>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-slate-900">Quizzes</h2>
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+              {data.live_quizzes.length}
+            </span>
+          </div>
         </div>
 
         {data.live_quizzes.length === 0 ? (
           <EmptyState
             icon={<Calendar className="h-6 w-6" />}
-            title="දැනට ප්‍රශ්නාවලි නොමැත"
-            desc="පරිපාලකයා විසින් නව ප්‍රශ්නාවලියක් ප්‍රකාශයට පත් කළ විට මෙහි දිස්වනු ඇත."
+            title="No quizzes yet"
+            desc="New quizzes will appear here as soon as the admin publishes them."
           />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -135,59 +147,67 @@ export default function DashboardPage() {
         )}
       </section>
 
-      {/* Past results */}
-      <section className="mt-8">
+      {/* ============ Past results ============ */}
+      <section className="mt-8 sm:mt-10">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">පසුගිය ප්‍රතිඵල</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Past results</h2>
+          {data.past_results.length > 0 && (
+            <span className="text-xs text-slate-500">
+              {data.past_results.length} record
+              {data.past_results.length !== 1 ? "s" : ""}
+            </span>
+          )}
         </div>
 
         {data.past_results.length === 0 ? (
           <EmptyState
             icon={<ClipboardList className="h-6 w-6" />}
-            title="තවම ප්‍රතිඵල නොමැත"
-            desc="පළමු ප්‍රශ්නාවලියට සහභාගී වූ පසු ඔබේ ප්‍රතිඵල මෙහි දිස්වනු ඇත."
+            title="No results yet"
+            desc="Finish your first quiz and your results will show up here."
           />
         ) : (
-          <div className="card overflow-hidden">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             {/* Desktop table */}
             <div className="hidden sm:block">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <thead className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   <tr>
-                    <th className="px-4 py-3 font-medium">ප්‍රශ්නාවලිය</th>
-                    <th className="px-4 py-3 font-medium">ලකුණු</th>
-                    <th className="px-4 py-3 font-medium">%</th>
-                    <th className="px-4 py-3 font-medium">වේලාව</th>
-                    <th className="px-4 py-3 font-medium">දිනය</th>
-                    <th className="px-4 py-3"></th>
+                    <th className="px-5 py-3">Quiz</th>
+                    <th className="px-5 py-3">Score</th>
+                    <th className="px-5 py-3">%</th>
+                    <th className="px-5 py-3">Time</th>
+                    <th className="px-5 py-3">Date</th>
+                    <th className="px-5 py-3 text-right">Review</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {data.past_results.map((r) => {
-                    const pct = r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
+                    const pct =
+                      r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
                     return (
-                      <tr key={r.id} className="hover:bg-slate-50">
-                        <td className="max-w-60 truncate px-4 py-3 font-medium text-slate-800">
+                      <tr key={r.id} className="transition hover:bg-slate-50/60">
+                        <td className="max-w-60 truncate px-5 py-3.5 font-medium text-slate-800">
                           {r.title}
                         </td>
-                        <td className="px-4 py-3 text-slate-700">
+                        <td className="px-5 py-3.5 tabular-nums text-slate-700">
                           {r.score} / {r.total}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-5 py-3.5">
                           <PctBadge pct={pct} />
                         </td>
-                        <td className="px-4 py-3 text-slate-600">
+                        <td className="px-5 py-3.5 tabular-nums text-slate-600">
                           {fmtDuration(r.time_spent_seconds)}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">
+                        <td className="px-5 py-3.5 text-slate-600">
                           {fmtDate(r.submitted_at)}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-5 py-3.5 text-right">
                           <Link
                             href={`/student/quiz/${r.quiz_id}`}
-                            className="text-xs font-semibold text-brand-600 hover:underline"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-sky-600 transition hover:text-sky-700"
                           >
-                            සමාලෝචනය
+                            Review
+                            <ChevronRight className="h-3 w-3" />
                           </Link>
                         </td>
                       </tr>
@@ -200,24 +220,27 @@ export default function DashboardPage() {
             {/* Mobile cards */}
             <div className="divide-y divide-slate-100 sm:hidden">
               {data.past_results.map((r) => {
-                const pct = r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
+                const pct =
+                  r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
                 return (
                   <Link
                     key={r.id}
                     href={`/student/quiz/${r.quiz_id}`}
-                    className="block px-4 py-3 active:bg-slate-50"
+                    className="block px-4 py-3.5 transition active:bg-slate-50"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-medium text-slate-800">{r.title}</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="line-clamp-1 flex-1 font-medium text-slate-800">
+                        {r.title}
+                      </span>
                       <PctBadge pct={pct} />
                     </div>
-                    <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
+                    <div className="mt-1.5 flex items-center gap-2 text-xs tabular-nums text-slate-500">
                       <span>
                         {r.score}/{r.total}
                       </span>
-                      <span>·</span>
+                      <span className="text-slate-300">·</span>
                       <span>{fmtDuration(r.time_spent_seconds)}</span>
-                      <span>·</span>
+                      <span className="text-slate-300">·</span>
                       <span>{fmtDate(r.submitted_at)}</span>
                     </div>
                   </Link>
@@ -231,36 +254,39 @@ export default function DashboardPage() {
   );
 }
 
-/* ---------------- Sub-components ---------------- */
+/* ------------------------------------------------------------------ */
+/*  Sub-components                                                    */
+/* ------------------------------------------------------------------ */
 
 function StatCard({
   icon,
   label,
-  en,
   value,
   accent,
 }: {
   icon: React.ReactNode;
   label: string;
-  en: string;
   value: string;
-  accent: "blue" | "green" | "amber" | "purple";
+  accent: "sky" | "emerald" | "amber" | "violet";
 }) {
   const accents = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-green-50 text-green-600",
+    sky: "bg-sky-50 text-sky-600",
+    emerald: "bg-emerald-50 text-emerald-600",
     amber: "bg-amber-50 text-amber-600",
-    purple: "bg-purple-50 text-purple-600",
+    violet: "bg-violet-50 text-violet-600",
   } as const;
 
   return (
-    <div className="card p-4">
-      <div className={`grid h-9 w-9 place-items-center rounded-lg ${accents[accent]}`}>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+      <div className={`grid h-9 w-9 place-items-center rounded-xl ${accents[accent]}`}>
         {icon}
       </div>
-      <div className="mt-3 text-2xl font-bold text-slate-900">{value}</div>
-      <div className="mt-0.5 text-xs font-medium text-slate-700">{label}</div>
-      <div className="text-[10px] uppercase tracking-wide text-slate-400">{en}</div>
+      <div className="mt-3 text-2xl font-bold tabular-nums tracking-tight text-slate-900">
+        {value}
+      </div>
+      <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+        {label}
+      </div>
     </div>
   );
 }
@@ -287,64 +313,100 @@ function QuizCard({
   const w = getQuizWindow(quiz.scheduled_at, quiz.duration_minutes);
   const attemptable = w.status === "active" && !quiz.attempted;
 
+  const statusBadge = quiz.attempted ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+      <CheckCircle2 className="h-3 w-3" /> Done
+    </span>
+  ) : w.status === "active" ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500" />
+      Live
+    </span>
+  ) : w.status === "upcoming" ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+      <Clock className="h-3 w-3" /> Soon
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+      Closed
+    </span>
+  );
+
   return (
-    <div className="card flex flex-col p-4 transition hover:shadow-md">
+    <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md hover:shadow-sky-100/60">
+      {/* Header */}
       <div className="flex items-start justify-between gap-2">
-        <h3 className="font-semibold text-slate-900 line-clamp-2">{quiz.title}</h3>
-        {quiz.attempted ? (
-          <span className="badge bg-green-50 text-green-700">
-            <CheckCircle2 className="h-3 w-3" /> නිමයි
-          </span>
-        ) : w.status === "active" ? (
-          <span className="badge bg-brand-50 text-brand-700">සක්‍රීය</span>
-        ) : w.status === "upcoming" ? (
-          <span className="badge bg-amber-50 text-amber-700">ඉදිරියේ</span>
-        ) : (
-          <span className="badge bg-slate-100 text-slate-600">අවසන්</span>
-        )}
+        <h3 className="line-clamp-2 font-semibold text-slate-900">
+          {quiz.title}
+        </h3>
+        {statusBadge}
       </div>
 
+      {/* Description */}
       {quiz.description && (
-        <p className="mt-2 line-clamp-2 text-sm text-slate-600">{quiz.description}</p>
+        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-600">
+          {quiz.description}
+        </p>
       )}
 
-      <div className="mt-3 flex items-center gap-3 text-xs text-slate-500">
-        <span className="flex items-center gap-1">
-          <ClipboardList className="h-3.5 w-3.5" /> {quiz.question_count} ප්‍රශ්න
+      {/* Meta */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+        <span className="inline-flex items-center gap-1">
+          <ClipboardList className="h-3.5 w-3.5" />
+          {quiz.question_count} questions
         </span>
-        <span className="flex items-center gap-1">
-          <Clock className="h-3.5 w-3.5" /> {quiz.duration_minutes} මිනිත්තු
+        <span className="inline-flex items-center gap-1">
+          <Clock className="h-3.5 w-3.5" />
+          {quiz.duration_minutes} min
         </span>
       </div>
 
-      <div className="mt-2 text-xs">
-        {w.status === "upcoming" && (
-          <span className="text-amber-700">
-            ආරම්භය {formatCountdown(w.remainingSeconds)} කින්
-          </span>
-        )}
-        {w.status === "active" && !quiz.attempted && (
-          <span className="font-medium text-brand-700">
-            අවසන් වන තෙක් {formatCountdown(w.remainingSeconds)}
-          </span>
-        )}
-        {w.status === "expired" && !quiz.attempted && (
-          <span className="text-slate-500">අවසන් විය</span>
-        )}
-      </div>
+      {/* Live timer line */}
+      {!quiz.attempted && w.status !== "expired" && (
+        <div className="mt-2 text-xs">
+          {w.status === "upcoming" && (
+            <span className="text-amber-700">
+              Starts in{" "}
+              <strong className="font-semibold tabular-nums">
+                {formatCountdown(w.remainingSeconds)}
+              </strong>
+            </span>
+          )}
+          {w.status === "active" && (
+            <span className="font-medium text-sky-700">
+              Ends in{" "}
+              <strong className="font-semibold tabular-nums">
+                {formatCountdown(w.remainingSeconds)}
+              </strong>
+            </span>
+          )}
+        </div>
+      )}
 
+      {/* Action */}
       <div className="mt-4">
         {attemptable ? (
-          <Link href={`/student/quiz/${quiz.id}`} className="btn-primary w-full">
-            <PlayCircle className="h-4 w-4" /> ආරම්භ කරන්න
+          <Link
+            href={`/student/quiz/${quiz.id}`}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+          >
+            <PlayCircle className="h-4 w-4" />
+            Start quiz
           </Link>
         ) : quiz.attempted ? (
-          <Link href={`/student/quiz/${quiz.id}`} className="btn-outline w-full">
-            <ChevronRight className="h-4 w-4" /> සමාලෝචනය
+          <Link
+            href={`/student/quiz/${quiz.id}`}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
+          >
+            Review answers
+            <ChevronRight className="h-4 w-4" />
           </Link>
         ) : (
-          <button disabled className="btn-outline w-full">
-            නොමැත
+          <button
+            disabled
+            className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-400"
+          >
+            Not available
           </button>
         )}
       </div>
@@ -355,11 +417,17 @@ function QuizCard({
 function PctBadge({ pct }: { pct: number }) {
   const tone =
     pct >= 75
-      ? "bg-green-50 text-green-700"
+      ? "bg-emerald-50 text-emerald-700"
       : pct >= 50
         ? "bg-amber-50 text-amber-700"
         : "bg-red-50 text-red-700";
-  return <span className={`badge ${tone}`}>{pct}%</span>;
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${tone}`}
+    >
+      {pct}%
+    </span>
+  );
 }
 
 function EmptyState({
@@ -372,12 +440,12 @@ function EmptyState({
   desc: string;
 }) {
   return (
-    <div className="card flex flex-col items-center justify-center px-6 py-12 text-center">
-      <div className="grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-500">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
+      <div className="grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-400">
         {icon}
       </div>
       <h3 className="mt-3 font-semibold text-slate-800">{title}</h3>
-      <p className="mt-1 max-w-sm text-sm text-slate-600">{desc}</p>
+      <p className="mt-1 max-w-sm text-sm text-slate-500">{desc}</p>
     </div>
   );
 }
@@ -386,7 +454,7 @@ function CenterSpinner({ label }: { label: string }) {
   return (
     <div className="grid min-h-[60vh] place-items-center">
       <div className="flex flex-col items-center gap-2 text-slate-500">
-        <Loader2 className="h-6 w-6 animate-spin" />
+        <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
         <span className="text-sm">{label}</span>
       </div>
     </div>
@@ -396,14 +464,22 @@ function CenterSpinner({ label }: { label: string }) {
 function CenterError({ message }: { message: string }) {
   return (
     <div className="mx-auto max-w-md px-4 py-16 text-center">
-      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        දත්ත පූරණය කිරීමේ දෝෂයක්: {message}
+      <div className="grid place-items-center">
+        <div className="grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-600">
+          <AlertTriangle className="h-6 w-6" />
+        </div>
       </div>
+      <h2 className="mt-4 text-lg font-semibold text-slate-900">
+        Failed to load dashboard
+      </h2>
+      <p className="mt-1 text-sm text-slate-600">{message}</p>
     </div>
   );
 }
 
-/* ---------------- Utilities ---------------- */
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                         */
+/* ------------------------------------------------------------------ */
 
 function fmtDuration(sec: number) {
   const m = Math.floor(sec / 60);

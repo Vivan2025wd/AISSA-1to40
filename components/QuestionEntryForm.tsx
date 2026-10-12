@@ -1,10 +1,10 @@
 "use client";
 
-import { CheckCircle2, Plus, Minus } from "lucide-react";
+import { CheckCircle2, Plus, Minus, Languages, BookOpen, Globe, Hash } from "lucide-react";
 import ImageUploadField from "./ImageUploadField";
 
 /* ------------------------------------------------------------------ */
-/*  Shared types                                                      */
+/*  Shared types & constants (UNCHANGED exports)                      */
 /* ------------------------------------------------------------------ */
 
 export const QUESTION_TOPICS = ["Biology", "Chemistry", "Physics", "General"] as const;
@@ -78,102 +78,143 @@ export default function QuestionEntryForm({
     onChange({ ...draft, [key]: value });
   }
 
+  /* ------------------------------------------------------------------ */
+  /*  Shared input class — used everywhere for consistency              */
+  /* ------------------------------------------------------------------ */
+  const inputBase =
+    "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500";
+
   return (
-    <div className="space-y-5">
-      {/* Topic */}
+    <div className="space-y-4 sm:space-y-5">
+      {/* ============ Topic ============ */}
       <div>
-        <FieldLabel si="විෂය" en="Topic" />
-        <select
-          className="input"
-          value={draft.topic}
-          disabled={disabled}
-          onChange={(e) => set("topic", e.target.value)}
-        >
-          {QUESTION_TOPICS.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+        <FieldLabel label="Topic" hint="Required" />
+        <div className="relative">
+          <BookOpen className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <select
+            className={`${inputBase} appearance-none pl-9 pr-9`}
+            value={draft.topic}
+            disabled={disabled}
+            onChange={(e) => set("topic", e.target.value)}
+          >
+            {QUESTION_TOPICS.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+            ▾
+          </span>
+        </div>
       </div>
 
-      {/* Sinhala */}
-      <Section title="සිංහල" subtitle="Sinhala (primary)">
+      {/* ============ Sinhala (primary) ============ */}
+      <Section
+        icon={<Languages className="h-4 w-4" />}
+        title="Sinhala"
+        subtitle="Primary"
+        accent="sky"
+      >
+        {/* Question text */}
         <div>
-          <FieldLabel si="ප්‍රශ්නය" en="Question" />
+          <FieldLabel label="Question" hint="Required" />
           <textarea
             rows={3}
-            className="input"
+            className={`${inputBase} resize-y leading-relaxed`}
+            placeholder="ප්‍රශ්නය මෙහි ලියන්න…"
             disabled={disabled}
             value={draft.question_text_si}
             onChange={(e) => set("question_text_si", e.target.value)}
           />
         </div>
 
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {[1, 2, 3, 4, 5].map((n) => {
-            if (n === 5 && optionCount === 4) return null;
-            const key = `option_${n}_si` as keyof QuestionDraft;
-            const isCorrect = draft.correct_option === n;
-            return (
-              <div key={n} className="flex items-start gap-2">
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => set("correct_option", n)}
-                  className={`mt-2 grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold transition ${
+        {/* Options */}
+        <div className="mt-4">
+          <FieldLabel
+            label="Options"
+            hint={`${optionCount} · tap the number to mark correct`}
+          />
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[1, 2, 3, 4, 5].map((n) => {
+              if (n === 5 && optionCount === 4) return null;
+              const key = `option_${n}_si` as keyof QuestionDraft;
+              const isCorrect = draft.correct_option === n;
+              return (
+                <div
+                  key={n}
+                  className={`flex items-stretch gap-2 rounded-lg border p-1 transition ${
                     isCorrect
-                      ? "bg-green-600 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      ? "border-emerald-300 bg-emerald-50/40"
+                      : "border-transparent"
                   }`}
-                  title="Mark as correct"
                 >
-                  {isCorrect ? <CheckCircle2 className="h-3.5 w-3.5" /> : n}
-                </button>
-                <input
-                  type="text"
-                  className="input"
-                  disabled={disabled}
-                  placeholder={`විකල්පය ${n}`}
-                  value={(draft[key] as string) ?? ""}
-                  onChange={(e) => set(key, e.target.value as never)}
-                />
-              </div>
-            );
-          })}
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => set("correct_option", n)}
+                    className={`grid h-10 w-10 shrink-0 place-items-center self-center rounded-lg text-xs font-bold transition ${
+                      isCorrect
+                        ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/25"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                    title={isCorrect ? "Marked as correct" : "Mark as correct"}
+                  >
+                    {isCorrect ? <CheckCircle2 className="h-4 w-4" /> : n}
+                  </button>
+                  <input
+                    type="text"
+                    className={`${inputBase} border-0 bg-transparent focus:ring-0`}
+                    disabled={disabled}
+                    placeholder={`Option ${n}`}
+                    value={(draft[key] as string) ?? ""}
+                    onChange={(e) => set(key, e.target.value as never)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Option-count toggle + correct marker summary */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                const next = optionCount === 4 ? 5 : 4;
+                onOptionCountChange(next);
+                if (next === 4 && draft.correct_option === 5) set("correct_option", 1);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 disabled:opacity-50"
+            >
+              {optionCount === 4 ? (
+                <>
+                  <Plus className="h-3.5 w-3.5" /> Add 5th option
+                </>
+              ) : (
+                <>
+                  <Minus className="h-3.5 w-3.5" /> Remove 5th option
+                </>
+              )}
+            </button>
+
+            <span className="inline-flex items-center gap-1.5 text-slate-500">
+              <span className="text-slate-400">Correct answer:</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700">
+                <Hash className="h-3 w-3" />
+                {draft.correct_option}
+              </span>
+            </span>
+          </div>
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => {
-              const next = optionCount === 4 ? 5 : 4;
-              onOptionCountChange(next);
-              if (next === 4 && draft.correct_option === 5) set("correct_option", 1);
-            }}
-            className="inline-flex items-center gap-1 text-brand-600 hover:underline"
-          >
-            {optionCount === 4 ? (
-              <>
-                <Plus className="h-3.5 w-3.5" /> 5වන විකල්පය එක් කරන්න
-              </>
-            ) : (
-              <>
-                <Minus className="h-3.5 w-3.5" /> 5වන විකල්පය ඉවත් කරන්න
-              </>
-            )}
-          </button>
-          <span className="text-slate-500">
-            නිවැරදි පිළිතුර: <strong className="text-slate-800">{draft.correct_option}</strong>
-          </span>
-        </div>
-
-        <div className="mt-3">
-          <FieldLabel si="පැහැදිලි කිරීම (අවශ්‍ය නම්)" en="Explanation" />
+        {/* Explanation */}
+        <div className="mt-4">
+          <FieldLabel label="Explanation" hint="Optional" />
           <textarea
             rows={2}
-            className="input"
+            className={`${inputBase} resize-y`}
+            placeholder="Review මුහුණතේ පෙන්වන පැහැදිලි කිරීම…"
             disabled={disabled}
             value={draft.explanation_si ?? ""}
             onChange={(e) => set("explanation_si", e.target.value)}
@@ -181,42 +222,59 @@ export default function QuestionEntryForm({
         </div>
       </Section>
 
-      {/* English */}
-      <Section title="English" subtitle="Optional">
+      {/* ============ English (optional) ============ */}
+      <Section
+        icon={<Globe className="h-4 w-4" />}
+        title="English"
+        subtitle="Optional"
+        accent="slate"
+      >
         <div>
-          <FieldLabel si="Question" en="" />
+          <FieldLabel label="Question" hint="Optional" />
           <textarea
             rows={2}
-            className="input"
+            className={`${inputBase} resize-y leading-relaxed`}
+            placeholder="Write the English translation here…"
             disabled={disabled}
             value={draft.question_text_en ?? ""}
             onChange={(e) => set("question_text_en", e.target.value)}
           />
         </div>
 
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {[1, 2, 3, 4, 5].map((n) => {
-            if (n === 5 && optionCount === 4) return null;
-            const key = `option_${n}_en` as keyof QuestionDraft;
-            return (
-              <input
-                key={n}
-                type="text"
-                className="input"
-                disabled={disabled}
-                placeholder={`Option ${n}`}
-                value={(draft[key] as string) ?? ""}
-                onChange={(e) => set(key, e.target.value as never)}
-              />
-            );
-          })}
+        <div className="mt-4">
+          <FieldLabel label="Options" hint="Optional" />
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[1, 2, 3, 4, 5].map((n) => {
+              if (n === 5 && optionCount === 4) return null;
+              const key = `option_${n}_en` as keyof QuestionDraft;
+              return (
+                <div
+                  key={n}
+                  className="flex items-stretch gap-2 rounded-lg border border-transparent p-1"
+                >
+                  <span className="grid h-10 w-10 shrink-0 place-items-center self-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600">
+                    {n}
+                  </span>
+                  <input
+                    type="text"
+                    className={`${inputBase} border-0 bg-transparent focus:ring-0`}
+                    disabled={disabled}
+                    placeholder={`Option ${n}`}
+                    value={(draft[key] as string) ?? ""}
+                    onChange={(e) => set(key, e.target.value as never)}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="mt-3">
-          <FieldLabel si="Explanation" en="" />
+        <div className="mt-4">
+          <FieldLabel label="Explanation" hint="Optional" />
           <textarea
             rows={2}
-            className="input"
+            className={`${inputBase} resize-y`}
+            placeholder="Explanation shown on the review page…"
             disabled={disabled}
             value={draft.explanation_en ?? ""}
             onChange={(e) => set("explanation_en", e.target.value)}
@@ -224,10 +282,12 @@ export default function QuestionEntryForm({
         </div>
       </Section>
 
-      {/* Image */}
+      {/* ============ Image ============ */}
       <ImageUploadField
         value={draft.image_url}
         onChange={(url) => set("image_url", url)}
+        label="Diagram"
+        sublabel="Optional"
         disabled={disabled}
       />
     </div>
@@ -238,31 +298,53 @@ export default function QuestionEntryForm({
 /*  Helpers                                                           */
 /* ------------------------------------------------------------------ */
 
-function FieldLabel({ si, en }: { si: string; en: string }) {
+function FieldLabel({ label, hint }: { label: string; hint?: string }) {
   return (
-    <div className="mb-1.5 flex items-baseline justify-between">
-      <span className="text-sm font-medium text-slate-800">{si}</span>
-      {en && <span className="text-[11px] text-slate-400">{en}</span>}
+    <div className="mb-1.5 flex items-baseline justify-between gap-3">
+      <span className="text-[13px] font-semibold text-slate-800">{label}</span>
+      {hint && (
+        <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+          {hint}
+        </span>
+      )}
     </div>
   );
 }
 
 function Section({
+  icon,
   title,
   subtitle,
+  accent,
   children,
 }: {
+  icon: React.ReactNode;
   title: string;
   subtitle: string;
+  accent: "sky" | "slate";
   children: React.ReactNode;
 }) {
+  const accentChip =
+    accent === "sky"
+      ? "bg-sky-50 text-sky-600"
+      : "bg-slate-100 text-slate-500";
+
   return (
-    <div className="rounded-lg border border-slate-200 p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <span className="font-semibold text-slate-800">{title}</span>
-        <span className="text-xs text-slate-400">{subtitle}</span>
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      {/* Section header */}
+      <div className="mb-4 flex items-center gap-2.5">
+        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${accentChip}`}>
+          {icon}
+        </span>
+        <div className="flex flex-1 items-baseline justify-between gap-3">
+          <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            {subtitle}
+          </span>
+        </div>
       </div>
+
       {children}
-    </div>
+    </section>
   );
 }

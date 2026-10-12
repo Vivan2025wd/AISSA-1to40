@@ -10,9 +10,14 @@ import {
   Loader2,
   ShieldCheck,
   ArrowLeft,
+  AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { setAdminSession, clearAdminSession } from "@/lib/admin-session";
+
+/* ------------------------------------------------------------------ */
+/*  Page                                                              */
+/* ------------------------------------------------------------------ */
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,7 +31,7 @@ export default function LoginPage() {
 
   /**
    * false → step 1: email + password
-   * true  → step 2: same card, access code field revealed below.
+   * true  → step 2: same card, access code revealed inline.
    *         Email/password stay visible but locked.
    */
   const [needsAdminCode, setNeedsAdminCode] = useState(false);
@@ -50,7 +55,7 @@ export default function LoginPage() {
       setLoading(false);
 
       if (rpcErr || !data) {
-        setError("පරිපාලක ප්‍රවේශ කේතය වැරදිය.");
+        setError("That admin access code is incorrect.");
         return;
       }
 
@@ -76,7 +81,10 @@ export default function LoginPage() {
     }
 
     // Auth succeeded — figure out who this is
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("is_admin")
@@ -98,7 +106,7 @@ export default function LoginPage() {
   }
 
   /* ------------------------------------------------------------- */
-  /*  Back to credentials (sign out the just-authed admin)         */
+  /*  Back to credentials                                          */
   /* ------------------------------------------------------------- */
   async function backToCredentials() {
     setError(null);
@@ -109,58 +117,81 @@ export default function LoginPage() {
     await supabase.auth.signOut();
   }
 
+  const inputBase =
+    "w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500";
+
   return (
-    <main className="grid min-h-screen place-items-center bg-linear-to-b from-brand-50 via-white to-white px-5 py-10">
+    <main className="grid min-h-screen place-items-center bg-linear-to-b from-sky-50 via-white to-slate-50 px-4 py-10 sm:px-5">
       <div className="w-full max-w-md">
-        <Link href="/" className="mb-6 flex items-center justify-center gap-2">
-          <div className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-white">
+        {/* ---------- Logo ---------- */}
+        <Link
+          href="/"
+          className="mb-6 flex items-center justify-center gap-2.5"
+        >
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-sky-500 text-white shadow-sm shadow-sky-500/30">
             <FlaskConical className="h-5 w-5" />
           </div>
-          <span className="text-lg font-bold text-slate-900">O/L Science Quiz</span>
+          <div className="leading-tight">
+            <div className="text-base font-bold tracking-tight text-slate-900">
+              O/L Science Quiz
+            </div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Sri Lanka
+            </div>
+          </div>
         </Link>
 
-        <div className="card p-6 sm:p-8">
-          {/* ---------- Heading ---------- */}
+        {/* ---------- Card ---------- */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          {/* ============ Header ============ */}
           {needsAdminCode ? (
             <>
-              <div className="mb-4 flex items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2.5">
-                <ShieldCheck className="h-5 w-5 shrink-0 text-brand-600" />
+              <div className="mb-4 flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-sky-500 text-white shadow-sm shadow-sky-500/30">
+                  <ShieldCheck className="h-4.5 w-4.5" />
+                </span>
                 <div className="min-w-0 text-xs">
-                  <div className="font-semibold text-brand-900">
-                    පරිපාලක ගිණුමක් හඳුනාගන්නා ලදී
+                  <div className="font-semibold text-sky-900">
+                    Admin account detected
                   </div>
-                  <div className="truncate text-brand-700">{email}</div>
+                  <div className="truncate text-sky-700">{email}</div>
                 </div>
               </div>
 
-              <h1 className="text-2xl font-bold text-slate-900">ප්‍රවේශ කේතය</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                Access code
+              </h1>
               <p className="mt-1 text-sm text-slate-600">
-                ඉදිරියට යාමට Admin access code ඇතුල් කරන්න.
+                Enter your admin access code to continue.
               </p>
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-bold text-slate-900">ඇතුල් වන්න</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                Welcome back
+              </h1>
               <p className="mt-1 text-sm text-slate-600">
-                Sign in · ඔබේ ගිණුමට පිවිසෙන්න.
+                Sign in to continue to your quizzes.
               </p>
             </>
           )}
 
+          {/* ============ Form ============ */}
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            {/* ---------- Email ---------- */}
+            {/* Email */}
             <label className="block">
               <div className="mb-1.5 flex items-baseline justify-between">
-                <span className="text-sm font-medium text-slate-800">විද්‍යුත් තැපෑල</span>
-                <span className="text-[11px] text-slate-400">Email</span>
+                <span className="text-[13px] font-semibold text-slate-800">
+                  Email
+                </span>
               </div>
               <div className="relative">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="email"
                   required
                   autoComplete="email"
-                  className="input pl-9 disabled:bg-slate-50 disabled:text-slate-500"
+                  className={inputBase}
                   placeholder="you@example.com"
                   value={email}
                   disabled={needsAdminCode}
@@ -169,19 +200,20 @@ export default function LoginPage() {
               </div>
             </label>
 
-            {/* ---------- Password ---------- */}
+            {/* Password */}
             <label className="block">
               <div className="mb-1.5 flex items-baseline justify-between">
-                <span className="text-sm font-medium text-slate-800">මුරපදය</span>
-                <span className="text-[11px] text-slate-400">Password</span>
+                <span className="text-[13px] font-semibold text-slate-800">
+                  Password
+                </span>
               </div>
               <div className="relative">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
                   required
                   autoComplete="current-password"
-                  className="input pl-9 disabled:bg-slate-50 disabled:text-slate-500"
+                  className={inputBase}
                   placeholder="••••••••"
                   value={password}
                   disabled={needsAdminCode}
@@ -190,21 +222,25 @@ export default function LoginPage() {
               </div>
             </label>
 
-            {/* ---------- Admin access code (revealed conditionally) ---------- */}
+            {/* Admin access code (revealed conditionally) */}
             {needsAdminCode && (
               <label className="block animate-in">
                 <div className="mb-1.5 flex items-baseline justify-between">
-                  <span className="text-sm font-medium text-slate-800">ප්‍රවේශ කේතය</span>
-                  <span className="text-[11px] text-slate-400">Admin code</span>
+                  <span className="text-[13px] font-semibold text-slate-800">
+                    Access code
+                  </span>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                    Required
+                  </span>
                 </div>
                 <div className="relative">
-                  <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <ShieldCheck className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-sky-500" />
                   <input
                     type="password"
                     autoFocus
                     autoComplete="off"
-                    className="input pl-9"
-                    placeholder="Access code"
+                    className={`${inputBase} border-sky-300 focus:border-sky-500`}
+                    placeholder="Enter code"
                     value={adminCode}
                     onChange={(e) => setAdminCode(e.target.value)}
                   />
@@ -212,74 +248,86 @@ export default function LoginPage() {
               </label>
             )}
 
-            {/* ---------- Error ---------- */}
+            {/* Error */}
             {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
+              <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
-            {/* ---------- Same button, two labels ---------- */}
+            {/* Submit button */}
             <button
               type="submit"
               disabled={
-                loading ||
-                (needsAdminCode ? !adminCode : !email || !password)
+                loading || (needsAdminCode ? !adminCode : !email || !password)
               }
-              className="btn-primary w-full py-3"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {loading
                 ? needsAdminCode
-                  ? "තහවුරු කරමින්..."
-                  : "පිවිසෙමින්..."
+                  ? "Verifying…"
+                  : "Signing in…"
                 : needsAdminCode
-                  ? "පරිපාලක පැනලයට යන්න"
-                  : "ඇතුල් වන්න"}
+                  ? "Continue to admin panel"
+                  : "Sign in"}
             </button>
 
-            {/* ---------- Switch account (admin step only) ---------- */}
+            {/* Switch account (admin step only) */}
             {needsAdminCode && (
               <button
                 type="button"
                 onClick={backToCredentials}
                 disabled={loading}
-                className="flex w-full items-center justify-center gap-1 pt-1 text-xs text-slate-500 hover:text-slate-800 disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-1.5 pt-1 text-xs font-medium text-slate-500 transition hover:text-slate-800 disabled:opacity-50"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                වෙනත් ගිණුමකින් ඇතුල් වන්න
+                Use a different account
               </button>
             )}
           </form>
 
-          {/* ---------- Register link (hidden once admin detected) ---------- */}
+          {/* ============ Register link ============ */}
           {!needsAdminCode && (
-            <p className="mt-6 text-center text-sm text-slate-600">
-              ගිණුමක් නැද්ද?{" "}
+            <div className="mt-6 border-t border-slate-100 pt-5 text-center text-sm text-slate-600">
+              Don't have an account?{" "}
               <Link
                 href="/auth/register"
-                className="font-semibold text-brand-600 hover:underline"
+                className="font-semibold text-sky-600 transition hover:text-sky-700 hover:underline"
               >
-                ලියාපදිංචි වන්න
+                Create one
               </Link>
-            </p>
+            </div>
           )}
+        </div>
+
+        {/* ============ Back to home ============ */}
+        <div className="mt-5 text-center">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-800"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            Back to home
+          </Link>
         </div>
       </div>
     </main>
   );
 }
 
-/* ------------------------------------------------------------- */
-/*  Error translation                                            */
-/* ------------------------------------------------------------- */
+/* ------------------------------------------------------------------ */
+/*  Error translation                                                 */
+/* ------------------------------------------------------------------ */
+
 function translateError(msg: string): string {
   const m = msg.toLowerCase();
   if (m.includes("invalid login") || m.includes("invalid credentials"))
-    return "විද්‍යුත් තැපෑල හෝ මුරපදය වැරදිය.";
+    return "Incorrect email or password.";
   if (m.includes("email not confirmed"))
-    return "කරුණාකර ඔබේ විද්‍යුත් තැපෑල තහවුරු කරන්න. (Inbox / Spam බලන්න)";
+    return "Please confirm your email first. Check your inbox (and spam).";
   if (m.includes("rate limit"))
-    return "ඉතා ඉක්මනින් උත්සාහ කළා. මඳක් රැඳී නැවත උත්සාහ කරන්න.";
-  return "පිවිසුම අසාර්ථකයි. නැවත උත්සාහ කරන්න.";
+    return "Too many attempts. Please wait a moment and try again.";
+  return "Sign in failed. Please try again.";
 }

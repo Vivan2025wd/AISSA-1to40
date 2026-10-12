@@ -18,6 +18,8 @@ import {
   RefreshCw,
   Library,
   Globe,
+  ShieldAlert,
+  Lock,
 } from "lucide-react";
 import { formatCountdown, getQuizWindow } from "@/lib/quiz-window";
 
@@ -68,7 +70,6 @@ interface AttemptMeta {
   submitted_at: string;
 }
 
-/** All the reasons the API can return for "unavailable". */
 type UnavailableReason =
   | "not_started"
   | "expired"
@@ -120,9 +121,7 @@ export default function QuizPage() {
     load();
   }, [load]);
 
-  /* Language preference:
-     1. If the quiz is for a specific medium, start in that medium.
-     2. Otherwise, use the saved preference. */
+  /* Language preference — quiz medium first, then saved pref */
   useEffect(() => {
     if (!data) return;
     const quizMedium = data.quiz.medium;
@@ -135,12 +134,11 @@ export default function QuizPage() {
     if (saved === "si" || saved === "en") setLang(saved);
   }, [data]);
 
-  /* Persist any manual toggle */
   useEffect(() => {
     localStorage.setItem("quiz_lang", lang);
   }, [lang]);
 
-  if (loading) return <CenterSpinner label="ප්‍රශ්නාවලිය පූරණය වෙමින්..." />;
+  if (loading) return <CenterSpinner label="Loading quiz…" />;
   if (error) return <ErrorView message={error} onRetry={load} />;
   if (!data) return null;
 
@@ -182,7 +180,7 @@ export default function QuizPage() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Exam view — the actual engine                                     */
+/*  Exam view                                                         */
 /* ------------------------------------------------------------------ */
 
 function ExamView({
@@ -291,83 +289,102 @@ function ExamView({
 
   const warningThreshold = 60;
 
-  /* Guard against empty question list */
   if (questions.length === 0) {
     return <EmptyQuestionsView quiz={quiz} />;
   }
 
   const q = questions[current];
+  const progressPct = ((current + 1) / questions.length) * 100;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-6">
-      {/* Top bar */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      {/* ============ Top bar ============ */}
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <Link
             href="/student/dashboard"
-            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"
+            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-slate-800"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> මුල් පිටුවට
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to dashboard
           </Link>
-          <h1 className="mt-1 truncate text-lg font-bold text-slate-900">{quiz.title}</h1>
+          <h1 className="mt-1 truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+            {quiz.title}
+          </h1>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             onClick={() => onToggleLang(lang === "si" ? "en" : "si")}
-            className="btn-outline px-3 py-2 text-xs"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 sm:px-3"
             title="Toggle language"
           >
             <Languages className="h-3.5 w-3.5" />
             {lang === "si" ? "English" : "සිංහල"}
           </button>
 
-          <TimerPill remaining={remaining} warning={remaining <= warningThreshold} />
-        </div>
-      </div>
-
-      {/* Progress */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between text-xs text-slate-500">
-          <span>
-            පිළිතුරු දී ඇත: <strong className="text-slate-800">{answeredCount}</strong> /{" "}
-            {questions.length}
-          </span>
-          <span>
-            ප්‍රශ්නය {current + 1} / {questions.length}
-          </span>
-        </div>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200">
-          <div
-            className="h-full bg-brand-600 transition-all"
-            style={{ width: `${((current + 1) / questions.length) * 100}%` }}
+          <TimerPill
+            remaining={remaining}
+            warning={remaining <= warningThreshold}
           />
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
-        {/* Question card */}
-        <div className="card p-5 sm:p-6">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="badge bg-brand-50 text-brand-700">{q.topic}</span>
-            <span className="text-xs text-slate-500">#{current + 1}</span>
+      {/* ============ Progress ============ */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className="inline-flex items-center gap-1.5 text-slate-500">
+            <span className="font-medium text-slate-700">
+              {answeredCount}
+            </span>
+            <span>
+              of {questions.length} answered
+            </span>
+          </span>
+          <span className="font-medium tabular-nums text-slate-500">
+            Question {current + 1} / {questions.length}
+          </span>
+        </div>
+        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200">
+          <div
+            className="h-full rounded-full bg-linear-to-r from-sky-500 to-sky-400 transition-all duration-300"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
+        {/* ============ Question card ============ */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          {/* Header row */}
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                {q.topic}
+              </span>
+              <span className="text-xs font-medium tabular-nums text-slate-400">
+                #{current + 1}
+              </span>
+            </div>
           </div>
 
+          {/* Question text */}
           <div className="prose prose-slate max-w-none">
-            <p className="whitespace-pre-wrap text-base font-medium text-slate-900 sm:text-lg">
+            <p className="whitespace-pre-wrap text-base font-medium leading-relaxed text-slate-900 sm:text-[17px]">
               {lang === "si" ? q.text_si : q.text_en ?? q.text_si}
             </p>
           </div>
 
+          {/* Image */}
           {q.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={q.image_url}
               alt="Question diagram"
-              className="mt-4 max-h-80 w-auto rounded-lg border border-slate-200"
+              className="mt-4 max-h-80 w-auto rounded-xl border border-slate-200 object-contain"
             />
           )}
 
+          {/* Options */}
           <div className="mt-5 space-y-2">
             {(lang === "si" ? q.options_si : q.options_en).map((opt, i) => {
               if (!opt) return null;
@@ -382,63 +399,74 @@ function ExamView({
                       [q.id]: selected ? null : value,
                     }))
                   }
-                  className={`flex w-full items-start gap-3 rounded-lg border p-3 text-left transition ${
+                  className={`flex w-full items-start gap-3 rounded-xl border p-3.5 text-left transition sm:p-3 ${
                     selected
-                      ? "border-brand-500 bg-brand-50"
-                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                      ? "border-sky-400 bg-sky-50/60 shadow-sm shadow-sky-500/5"
+                      : "border-slate-200 hover:border-sky-200 hover:bg-slate-50/60 active:bg-slate-100"
                   }`}
                 >
                   <span
-                    className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
+                    className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold tabular-nums transition sm:h-6 sm:w-6 ${
                       selected
-                        ? "bg-brand-600 text-white"
+                        ? "bg-sky-500 text-white"
                         : "bg-slate-100 text-slate-600"
                     }`}
                   >
                     {value}
                   </span>
-                  <span className="text-sm text-slate-800">{opt}</span>
+                  <span className="flex-1 text-sm leading-relaxed text-slate-800">
+                    {opt}
+                  </span>
                 </button>
               );
             })}
           </div>
 
-          <div className="mt-6 flex items-center justify-between">
+          {/* Nav buttons */}
+          <div className="mt-6 flex items-center justify-between gap-3">
             <button
               onClick={() => setCurrent((c) => Math.max(0, c - 1))}
               disabled={current === 0}
-              className="btn-outline"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <ChevronLeft className="h-4 w-4" /> පෙර
+              <ChevronLeft className="h-4 w-4" /> Previous
             </button>
 
             {current < questions.length - 1 ? (
               <button
-                onClick={() => setCurrent((c) => Math.min(questions.length - 1, c + 1))}
-                className="btn-primary"
+                onClick={() =>
+                  setCurrent((c) => Math.min(questions.length - 1, c + 1))
+                }
+                className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
               >
-                ඊළඟ <ChevronRight className="h-4 w-4" />
+                Next <ChevronRight className="h-4 w-4" />
               </button>
             ) : (
               <button
                 onClick={() => setConfirmOpen(true)}
                 disabled={submitting}
-                className="btn-primary"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:opacity-50"
               >
-                <Send className="h-4 w-4" /> ඉදිරිපත් කරන්න
+                <Send className="h-4 w-4" /> Submit
               </button>
             )}
           </div>
         </div>
 
-        {/* Palette */}
+        {/* ============ Palette ============ */}
         <aside className="lg:sticky lg:top-20 lg:self-start">
-          <div className="card p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-700">ප්‍රශ්න පුවරුව</span>
-              <span className="text-[10px] uppercase text-slate-400">Palette</span>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Questions
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-slate-600">
+                {answeredCount}/{questions.length}
+              </span>
             </div>
-            <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-6 lg:grid-cols-5">
+
+            {/* Palette grid */}
+            <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-8 lg:grid-cols-5">
               {questions.map((qq, i) => {
                 const isAnswered = answers[qq.id] != null;
                 const isCurrent = i === current;
@@ -446,65 +474,115 @@ function ExamView({
                   <button
                     key={qq.id}
                     onClick={() => setCurrent(i)}
-                    className={`grid h-8 w-8 place-items-center rounded-md text-xs font-semibold transition ${
-                      isCurrent ? "ring-2 ring-brand-500 ring-offset-1" : ""
+                    aria-label={`Go to question ${i + 1}`}
+                    className={`relative grid h-9 w-9 place-items-center rounded-lg text-xs font-bold tabular-nums transition active:scale-95 ${
+                      isCurrent
+                        ? "ring-2 ring-sky-500 ring-offset-2"
+                        : ""
                     } ${
                       isAnswered
-                        ? "bg-brand-600 text-white hover:bg-brand-700"
+                        ? "bg-sky-500 text-white hover:bg-sky-600"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
                     {i + 1}
+                    {isCurrent && (
+                      <span className="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-sky-500" />
+                    )}
                   </button>
                 );
               })}
             </div>
 
+            {/* Legend */}
+            <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3 text-[10px] text-slate-500">
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-sky-500" />
+                Answered
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-slate-300" />
+                Empty
+              </span>
+            </div>
+
             <button
               onClick={() => setConfirmOpen(true)}
               disabled={submitting}
-              className="btn-primary mt-3 w-full"
+              className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:opacity-50"
             >
-              <Send className="h-4 w-4" /> ඉදිරිපත් කරන්න
+              <Send className="h-4 w-4" /> Submit quiz
             </button>
-            <p className="mt-2 text-[10px] leading-tight text-slate-500">
-              පිළිතුරු ස්වයංක්‍රීයව සුරැකේ. වේලාව අවසන් වූ විට ස්වයංක්‍රීයව ඉදිරිපත් වේ.
+
+            <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-slate-500">
+              <Lock className="mt-0.5 h-3 w-3 shrink-0" />
+              <span>
+                Your answers save automatically. The quiz submits itself
+                when time runs out.
+              </span>
             </p>
           </div>
         </aside>
       </div>
 
-      {/* Confirm dialog */}
+      {/* ============ Confirm dialog ============ */}
       {confirmOpen && (
         <Modal onClose={() => setConfirmOpen(false)}>
-          <div className="grid h-12 w-12 place-items-center rounded-full bg-amber-100 text-amber-600">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-amber-100 text-amber-600">
             <AlertTriangle className="h-6 w-6" />
           </div>
-          <h2 className="mt-4 text-lg font-bold text-slate-900">ඉදිරිපත් කරන්නද?</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            ඔබ ප්‍රශ්න {questions.length} න් <strong>{answeredCount}</strong> කට පිළිතුරු දී ඇත.
-            ඉදිරිපත් කිරීමෙන් පසු නැවත වෙනස් කළ නොහැක.
+          <h2 className="mt-4 text-lg font-bold text-slate-900">
+            Submit your quiz?
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            You've answered{" "}
+            <strong className="font-semibold text-slate-900">
+              {answeredCount}
+            </strong>{" "}
+            of {questions.length} questions.
           </p>
-          {submitError && (
-            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              {submitError}
+
+          {answeredCount < questions.length && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs text-amber-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                {questions.length - answeredCount} question
+                {questions.length - answeredCount !== 1 ? "s" : ""} still
+                unanswered
+              </span>
             </div>
           )}
+
+          <p className="mt-3 text-xs text-slate-500">
+            You can't change your answers after submitting.
+          </p>
+
+          {submitError && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-left text-xs text-red-700">
+              <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>{submitError}</span>
+            </div>
+          )}
+
           <div className="mt-5 flex gap-2">
             <button
               onClick={() => setConfirmOpen(false)}
               disabled={submitting}
-              className="btn-outline flex-1"
+              className="inline-flex flex-1 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
             >
-              රැඳී සිටින්න
+              Keep working
             </button>
             <button
               onClick={() => submit(false)}
               disabled={submitting}
-              className="btn-primary flex-1"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:opacity-50"
             >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              ඉදිරිපත් කරන්න
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              Submit
             </button>
           </div>
         </Modal>
@@ -519,17 +597,23 @@ function ExamView({
 
 function EmptyQuestionsView({ quiz }: { quiz: QuizMeta }) {
   return (
-    <div className="mx-auto max-w-md px-4 py-12 text-center">
-      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-amber-100 text-amber-600">
+    <div className="mx-auto max-w-md px-4 py-16 text-center">
+      <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-amber-100 text-amber-600">
         <Library className="h-7 w-7" />
       </div>
-      <h1 className="mt-4 text-xl font-bold text-slate-900">ප්‍රශ්න නොමැත</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        මෙම ප්‍රශ්නාවලියට තවම ප්‍රශ්න එක් කර නොමැත. කරුණාකර පරිපාලකයා අමතන්න.
+      <h1 className="mt-4 text-xl font-bold tracking-tight text-slate-900">
+        No questions yet
+      </h1>
+      <p className="mt-2 text-sm leading-relaxed text-slate-600">
+        This quiz doesn't have any questions attached. Please contact an
+        administrator.
       </p>
-      <p className="mt-3 text-xs text-slate-500">{quiz.title}</p>
-      <Link href="/student/dashboard" className="btn-primary mt-6">
-        <ArrowLeft className="h-4 w-4" /> මුල් පිටුවට
+      <p className="mt-3 text-xs text-slate-400">{quiz.title}</p>
+      <Link
+        href="/student/dashboard"
+        className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to dashboard
       </Link>
     </div>
   );
@@ -552,163 +636,232 @@ function ReviewView({
   lang: "si" | "en";
   onToggleLang: (l: "si" | "en") => void;
 }) {
-  const pct = attempt.total > 0 ? Math.round((attempt.score / attempt.total) * 100) : 0;
-  const grade = pct >= 75 ? "green" : pct >= 50 ? "amber" : "red";
+  const pct =
+    attempt.total > 0 ? Math.round((attempt.score / attempt.total) * 100) : 0;
+  const grade = pct >= 75 ? "emerald" : pct >= 50 ? "amber" : "red";
+  const correctCount = questions.filter((q) => q.is_correct).length;
+  const wrongCount = questions.length - correctCount;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-5 sm:px-6 sm:py-6">
       <Link
         href="/student/dashboard"
-        className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"
+        className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-slate-800"
       >
-        <ArrowLeft className="h-3.5 w-3.5" /> මුල් පිටුවට
+        <ArrowLeft className="h-3.5 w-3.5" /> Back to dashboard
       </Link>
 
-      <h1 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{quiz.title}</h1>
+      <h1 className="mt-1 truncate text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+        {quiz.title}
+      </h1>
 
-      {/* Score card */}
-      <div
-        className={`card mt-4 border-l-4 p-5 ${
-          grade === "green"
-            ? "border-l-green-500"
-            : grade === "amber"
-              ? "border-l-amber-500"
-              : "border-l-red-500"
-        }`}
-      >
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-xs uppercase tracking-wide text-slate-500">ඔබේ ලකුණු</div>
-            <div className="mt-1 text-4xl font-bold text-slate-900">
-              {attempt.score}
-              <span className="text-2xl text-slate-400">/{attempt.total}</span>
+      {/* ============ Score card ============ */}
+      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* Score strip */}
+        <div
+          className={`h-1.5 ${
+            grade === "emerald"
+              ? "bg-emerald-500"
+              : grade === "amber"
+                ? "bg-amber-500"
+                : "bg-red-500"
+          }`}
+        />
+        <div className="p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Your score
+              </div>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-4xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-5xl">
+                  {attempt.score}
+                </span>
+                <span className="text-xl font-medium text-slate-400 sm:text-2xl">
+                  /{attempt.total}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                <span className="inline-flex items-center gap-1 tabular-nums">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                  {correctCount} correct
+                </span>
+                <span className="inline-flex items-center gap-1 tabular-nums">
+                  <XCircle className="h-3.5 w-3.5 text-red-500" />
+                  {wrongCount} wrong
+                </span>
+                <span className="inline-flex items-center gap-1 tabular-nums">
+                  <Clock className="h-3.5 w-3.5 text-slate-400" />
+                  {fmtDuration(attempt.time_spent_seconds)}
+                </span>
+              </div>
             </div>
-            <div className="mt-1 text-sm text-slate-600">
-              {pct}% · වේලාව {fmtDuration(attempt.time_spent_seconds)}
+
+            {/* Percentage ring */}
+            <div
+              className={`grid h-20 w-20 shrink-0 place-items-center rounded-full text-2xl font-bold tabular-nums tracking-tight ${
+                grade === "emerald"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : grade === "amber"
+                    ? "bg-amber-50 text-amber-700"
+                    : "bg-red-50 text-red-700"
+              }`}
+            >
+              {pct}%
             </div>
           </div>
-          <div
-            className={`grid h-16 w-16 shrink-0 place-items-center rounded-full text-xl font-bold ${
-              grade === "green"
-                ? "bg-green-50 text-green-700"
-                : grade === "amber"
-                  ? "bg-amber-50 text-amber-700"
-                  : "bg-red-50 text-red-700"
-            }`}
-          >
-            {pct}%
-          </div>
-        </div>
 
-        <div className="mt-4 flex items-center gap-2">
-          <button
-            onClick={() => onToggleLang(lang === "si" ? "en" : "si")}
-            className="btn-outline text-xs"
-          >
-            <Languages className="h-3.5 w-3.5" />
-            {lang === "si" ? "English" : "සිංහල"}
-          </button>
+          <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4">
+            <button
+              onClick={() => onToggleLang(lang === "si" ? "en" : "si")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
+            >
+              <Languages className="h-3.5 w-3.5" />
+              {lang === "si" ? "Switch to English" : "සිංහල බලන්න"}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Questions review */}
+      {/* ============ Question-by-question review ============ */}
       <div className="mt-6 space-y-4">
         {questions.map((q, i) => {
           const opts = lang === "si" ? q.options_si : q.options_en;
           const text = lang === "si" ? q.text_si : q.text_en ?? q.text_si;
           const explanation =
-            lang === "si" ? q.explanation_si : q.explanation_en ?? q.explanation_si;
+            lang === "si"
+              ? q.explanation_si
+              : q.explanation_en ?? q.explanation_si;
 
           return (
-            <div key={q.id} className="card p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
-                    {i + 1}
-                  </span>
-                  <span className="badge bg-slate-100 text-slate-700">{q.topic}</span>
-                </div>
-                {q.is_correct ? (
-                  <span className="badge bg-green-50 text-green-700">
-                    <CheckCircle2 className="h-3 w-3" /> නිවැරදි
-                  </span>
-                ) : (
-                  <span className="badge bg-red-50 text-red-700">
-                    <XCircle className="h-3 w-3" /> වැරදි
-                  </span>
-                )}
-              </div>
+            <div
+              key={q.id}
+              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+            >
+              {/* Status strip */}
+              <div
+                className={`h-1 ${
+                  q.is_correct ? "bg-emerald-500" : "bg-red-500"
+                }`}
+              />
 
-              <p className="mt-3 whitespace-pre-wrap text-sm font-medium text-slate-900 sm:text-base">
-                {text}
-              </p>
-
-              {q.image_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={q.image_url}
-                  alt="Diagram"
-                  className="mt-3 max-h-64 rounded-lg border border-slate-200"
-                />
-              )}
-
-              <div className="mt-3 space-y-2">
-                {opts.map((opt, idx) => {
-                  if (!opt) return null;
-                  const value = idx + 1;
-                  const isCorrect = value === q.correct_option;
-                  const isSelected = value === q.selected_option;
-                  const isWrong = isSelected && !isCorrect;
-
-                  return (
-                    <div
-                      key={idx}
-                      className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${
-                        isCorrect
-                          ? "border-green-300 bg-green-50"
-                          : isWrong
-                            ? "border-red-300 bg-red-50"
-                            : "border-slate-200"
+              <div className="p-5">
+                {/* Header row */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`grid h-8 w-8 place-items-center rounded-lg text-xs font-bold tabular-nums ${
+                        q.is_correct
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-red-50 text-red-700"
                       }`}
                     >
-                      <span
-                        className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
+                      {i + 1}
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                      {q.topic}
+                    </span>
+                  </div>
+                  {q.is_correct ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                      <CheckCircle2 className="h-3 w-3" /> Correct
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-red-700">
+                      <XCircle className="h-3 w-3" /> Wrong
+                    </span>
+                  )}
+                </div>
+
+                {/* Question text */}
+                <p className="mt-3 whitespace-pre-wrap text-sm font-medium leading-relaxed text-slate-900 sm:text-base">
+                  {text}
+                </p>
+
+                {/* Image */}
+                {q.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={q.image_url}
+                    alt="Diagram"
+                    className="mt-3 max-h-64 rounded-xl border border-slate-200 object-contain"
+                  />
+                )}
+
+                {/* Options with highlighting */}
+                <div className="mt-4 space-y-2">
+                  {opts.map((opt, idx) => {
+                    if (!opt) return null;
+                    const value = idx + 1;
+                    const isCorrect = value === q.correct_option;
+                    const isSelected = value === q.selected_option;
+                    const isWrong = isSelected && !isCorrect;
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex items-start gap-3 rounded-xl border p-3 text-sm transition ${
                           isCorrect
-                            ? "bg-green-600 text-white"
+                            ? "border-emerald-300 bg-emerald-50/70"
                             : isWrong
-                              ? "bg-red-600 text-white"
-                              : "bg-slate-100 text-slate-600"
+                              ? "border-red-300 bg-red-50/70"
+                              : "border-slate-200"
                         }`}
                       >
-                        {value}
-                      </span>
-                      <span className="flex-1 text-slate-800">{opt}</span>
-                      {isSelected && (
-                        <span className="text-[10px] font-semibold uppercase text-slate-500">
-                          ඔබ
+                        <span
+                          className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold tabular-nums ${
+                            isCorrect
+                              ? "bg-emerald-500 text-white"
+                              : isWrong
+                                ? "bg-red-500 text-white"
+                                : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {value}
                         </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {explanation && (
-                <div className="mt-4 rounded-lg border border-brand-100 bg-brand-50/50 p-3">
-                  <div className="mb-1 text-xs font-semibold text-brand-800">
-                    පැහැදිලි කිරීම
-                  </div>
-                  <p className="whitespace-pre-wrap text-sm text-slate-700">{explanation}</p>
+                        <span className="flex-1 leading-relaxed text-slate-800">
+                          {opt}
+                        </span>
+                        {isSelected && (
+                          <span
+                            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                              isCorrect
+                                ? "bg-emerald-500 text-white"
+                                : "bg-red-500 text-white"
+                            }`}
+                          >
+                            Your pick
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+
+                {/* Explanation */}
+                {explanation && (
+                  <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/50 p-4">
+                    <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-sky-800">
+                      <Library className="h-3 w-3" />
+                      Explanation
+                    </div>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                      {explanation}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="mt-8 text-center">
-        <Link href="/student/leaderboard" className="btn-outline">
-          <Flag className="h-4 w-4" /> ශ්‍රේණිගත කිරීම් බලන්න
+      <div className="mt-8 flex justify-center">
+        <Link
+          href="/student/leaderboard"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
+        >
+          <Flag className="h-4 w-4" /> View leaderboard
         </Link>
       </div>
     </div>
@@ -742,47 +895,71 @@ function UnavailableView({
         return {
           icon: <Clock className="h-7 w-7" />,
           tone: "amber" as const,
-          title: "තවම ආරම්භ වී නැත",
-          desc: `ප්‍රශ්නාවලිය ${formatCountdown(remaining)} කින් ආරම්භ වේ.`,
+          title: "Quiz hasn't started yet",
+          desc: "This quiz opens in a little while.",
+          showCountdown: true,
         };
       case "expired":
         return {
           icon: <XCircle className="h-7 w-7" />,
           tone: "slate" as const,
-          title: "ප්‍රශ්නාවලිය අවසන් විය",
-          desc: "මෙම ප්‍රශ්නාවලියට සහභාගී වීමට නියමිත වේලාව ඉක්මවා ඇත.",
+          title: "Quiz has ended",
+          desc: "The time window for this quiz has closed.",
+          showCountdown: false,
         };
       case "wrong_medium":
         return {
           icon: <Globe className="h-7 w-7" />,
           tone: "amber" as const,
-          title: "වෙනත් මාධ්‍යයක ප්‍රශ්නාවලියක්",
-          desc: "මෙම ප්‍රශ්නාවලිය ඔබ ලියාපදිංචි වූ ඉගෙනුම් මාධ්‍යයට අදාළ නොවේ.",
+          title: "Different medium",
+          desc: "This quiz is for a different medium than the one you registered for.",
+          showCountdown: false,
         };
       case "unpublished":
       default:
         return {
-          icon: <AlertTriangle className="h-7 w-7" />,
+          icon: <ShieldAlert className="h-7 w-7" />,
           tone: "slate" as const,
-          title: "ප්‍රකාශයට පත් කර නැත",
-          desc: "මෙම ප්‍රශ්නාවලිය තවම ප්‍රකාශයට පත් කර නොමැත.",
+          title: "Not published",
+          desc: "This quiz hasn't been published yet.",
+          showCountdown: false,
         };
     }
   })();
 
   const toneClass =
-    meta.tone === "amber" ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-500";
+    meta.tone === "amber"
+      ? "bg-amber-100 text-amber-600"
+      : "bg-slate-100 text-slate-500";
 
   return (
-    <div className="mx-auto max-w-md px-4 py-12 text-center">
-      <div className={`mx-auto grid h-16 w-16 place-items-center rounded-full ${toneClass}`}>
+    <div className="mx-auto max-w-md px-4 py-16 text-center">
+      <div
+        className={`mx-auto grid h-16 w-16 place-items-center rounded-2xl ${toneClass}`}
+      >
         {meta.icon}
       </div>
-      <h1 className="mt-4 text-xl font-bold text-slate-900">{meta.title}</h1>
-      <p className="mt-1 text-sm text-slate-600">{meta.desc}</p>
-      <p className="mt-3 text-xs text-slate-500">{quiz.title}</p>
-      <Link href="/student/dashboard" className="btn-primary mt-6">
-        <ArrowLeft className="h-4 w-4" /> මුල් පිටුවට
+      <h1 className="mt-5 text-xl font-bold tracking-tight text-slate-900">
+        {meta.title}
+      </h1>
+      <p className="mt-2 text-sm leading-relaxed text-slate-600">
+        {meta.desc}
+      </p>
+
+      {meta.showCountdown && (
+        <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold tabular-nums text-amber-800">
+          <Clock className="h-4 w-4" />
+          {formatCountdown(remaining)}
+        </div>
+      )}
+
+      <p className="mt-4 text-xs text-slate-400">{quiz.title}</p>
+
+      <Link
+        href="/student/dashboard"
+        className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to dashboard
       </Link>
     </div>
   );
@@ -792,11 +969,22 @@ function UnavailableView({
 /*  Small shared bits                                                 */
 /* ------------------------------------------------------------------ */
 
-function TimerPill({ remaining, warning }: { remaining: number; warning: boolean }) {
+function TimerPill({
+  remaining,
+  warning,
+}: {
+  remaining: number;
+  warning: boolean;
+}) {
+  const critical = remaining <= 15;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold tabular-nums ${
-        warning ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-800"
+      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-bold tabular-nums transition sm:px-3 ${
+        critical
+          ? "animate-pulse bg-red-500 text-white shadow-sm shadow-red-500/30"
+          : warning
+            ? "bg-red-50 text-red-700 ring-1 ring-red-200"
+            : "bg-slate-100 text-slate-800"
       }`}
     >
       <Clock className="h-3.5 w-3.5" />
@@ -805,14 +993,20 @@ function TimerPill({ remaining, warning }: { remaining: number; warning: boolean
   );
 }
 
-function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+function Modal({
+  children,
+  onClose,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4"
+      className="fixed inset-0 z-50 grid place-items-center bg-slate-900/60 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
+        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-900/5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-center">{children}</div>
@@ -825,21 +1019,34 @@ function CenterSpinner({ label }: { label: string }) {
   return (
     <div className="grid min-h-[60vh] place-items-center">
       <div className="flex flex-col items-center gap-2 text-slate-500">
-        <Loader2 className="h-6 w-6 animate-spin" />
+        <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
         <span className="text-sm">{label}</span>
       </div>
     </div>
   );
 }
 
-function ErrorView({ message, onRetry }: { message: string; onRetry: () => void }) {
+function ErrorView({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
   return (
     <div className="mx-auto max-w-md px-4 py-16 text-center">
-      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-        {message}
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-600">
+        <XCircle className="h-6 w-6" />
       </div>
-      <button onClick={onRetry} className="btn-outline mt-4">
-        <RefreshCw className="h-4 w-4" /> නැවත උත්සාහ කරන්න
+      <h2 className="mt-4 text-lg font-semibold text-slate-900">
+        Couldn't load quiz
+      </h2>
+      <p className="mt-1 text-sm text-slate-600">{message}</p>
+      <button
+        onClick={onRetry}
+        className="mt-6 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+      >
+        <RefreshCw className="h-4 w-4" /> Try again
       </button>
     </div>
   );

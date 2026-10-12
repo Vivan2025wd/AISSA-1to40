@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Loader2,
@@ -18,9 +18,17 @@ import {
   User,
   School as SchoolIcon,
   Users as UsersIcon,
+  Eye,
+  EyeOff,
+  UserCheck,
+  UserMinus,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import SchoolAutocomplete from "@/components/SchoolAutocomplete";
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                             */
+/* ------------------------------------------------------------------ */
 
 interface UserRow {
   id: string;
@@ -33,6 +41,10 @@ interface UserRow {
 }
 
 type Tab = "admins" | "students";
+
+/* ------------------------------------------------------------------ */
+/*  Page                                                              */
+/* ------------------------------------------------------------------ */
 
 export default function SuperAdminPage() {
   const router = useRouter();
@@ -56,11 +68,13 @@ export default function SuperAdminPage() {
     | null
   >(null);
 
-  /* ---------- auth + role check ---------- */
+  /* ---------- Auth + role check ---------- */
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         router.replace("/auth/login");
         return;
@@ -78,7 +92,7 @@ export default function SuperAdminPage() {
     })();
   }, [router]);
 
-  /* ---------- load users ---------- */
+  /* ---------- Load users ---------- */
 
   async function load() {
     setLoading(true);
@@ -100,9 +114,12 @@ export default function SuperAdminPage() {
     if (meIsSuper) load();
   }, [meIsSuper]);
 
-  /* ---------- actions ---------- */
+  /* ---------- Actions ---------- */
 
-  async function doAction(action: "promote" | "demote" | "delete", userId: string) {
+  async function doAction(
+    action: "promote" | "demote" | "delete",
+    userId: string
+  ) {
     const res = await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -110,7 +127,7 @@ export default function SuperAdminPage() {
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      throw new Error(j.error ?? "ක්‍රියාව අසාර්ථකයි");
+      throw new Error(j.error ?? "Action failed");
     }
   }
 
@@ -136,12 +153,15 @@ export default function SuperAdminPage() {
     }
   }
 
-  /* ---------- guards ---------- */
+  /* ---------- Guards ---------- */
 
   if (!loaded) {
     return (
       <div className="grid min-h-[60vh] place-items-center">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+        <div className="flex flex-col items-center gap-2 text-slate-500">
+          <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+          <span className="text-sm">Checking permissions…</span>
+        </div>
       </div>
     );
   }
@@ -149,18 +169,20 @@ export default function SuperAdminPage() {
   if (!meIsSuper) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-red-100 text-red-600">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-red-100 text-red-600">
           <ShieldOff className="h-7 w-7" />
         </div>
-        <h1 className="mt-4 text-xl font-bold text-slate-900">ප්‍රවේශය ප්‍රතික්ෂේප විය</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          මෙම පිටුව සුපිරි පරිපාලකයන් සඳහා පමණි.
+        <h1 className="mt-4 text-xl font-bold tracking-tight text-slate-900">
+          Access denied
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">
+          This page is restricted to super admins only.
         </p>
       </div>
     );
   }
 
-  /* ---------- filter ---------- */
+  /* ---------- Filter ---------- */
 
   const list = tab === "admins" ? admins : students;
   const q = query.trim().toLowerCase();
@@ -175,102 +197,119 @@ export default function SuperAdminPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* ============ Header ============ */}
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-xl bg-amber-100 text-amber-700">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700 shadow-sm shadow-amber-500/10">
             <Crown className="h-6 w-6" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-              පරිපාලක කළමනාකරණය
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              User management
             </h1>
-            <p className="mt-0.5 text-sm text-slate-600">
+            <p className="mt-0.5 text-sm text-slate-500">
               Manage admins and students
             </p>
           </div>
         </div>
-        <button onClick={() => setCreateOpen(true)} className="btn-primary">
-          <Plus className="h-4 w-4" /> නව පරිපාලකයෙක්
-        </button>
-      </div>
 
-      {/* Tabs + search */}
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm">
+        <button
+          onClick={() => setCreateOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+        >
+          <Plus className="h-4 w-4" /> New admin
+        </button>
+      </header>
+
+      {/* ============ Tabs + search ============ */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="inline-flex w-fit rounded-xl border border-slate-200 bg-slate-100/60 p-1 text-sm">
           <button
             onClick={() => setTab("admins")}
-            className={`inline-flex items-center gap-2 rounded-md px-4 py-2 font-medium transition ${
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 font-semibold transition ${
               tab === "admins"
                 ? "bg-white text-slate-900 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <ShieldCheck className="h-4 w-4" />
-            පරිපාලකයන්
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">
+            Admins
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums transition ${
+                tab === "admins"
+                  ? "bg-sky-100 text-sky-700"
+                  : "bg-white/70 text-slate-600"
+              }`}
+            >
               {admins.length}
             </span>
           </button>
           <button
             onClick={() => setTab("students")}
-            className={`inline-flex items-center gap-2 rounded-md px-4 py-2 font-medium transition ${
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 font-semibold transition ${
               tab === "students"
                 ? "bg-white text-slate-900 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <UsersIcon className="h-4 w-4" />
-            සිසුන්
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">
+            Students
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums transition ${
+                tab === "students"
+                  ? "bg-sky-100 text-sky-700"
+                  : "bg-white/70 text-slate-600"
+              }`}
+            >
               {students.length}
             </span>
           </button>
         </div>
 
-        <div className="relative sm:w-72">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div className="relative lg:w-80">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
-            className="input pl-9"
-            placeholder="නම, ඊමේල් හෝ පාසල..."
+            className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+            placeholder="Search by name, email, or school…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
       </div>
 
-      {/* Error banner */}
+      {/* ============ Error banner ============ */}
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          {error}
+          <span>{error}</span>
         </div>
       )}
 
-      {/* Table */}
-      <div className="card mt-4 overflow-hidden">
+      {/* ============ Table ============ */}
+      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
           <div className="grid place-items-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <div className="flex flex-col items-center gap-2 text-slate-500">
+              <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
+              <span className="text-sm">Loading users…</span>
+            </div>
           </div>
         ) : filtered.length === 0 ? (
-          <p className="px-6 py-12 text-center text-sm text-slate-500">
-            {list.length === 0
-              ? tab === "admins"
-                ? "පරිපාලකයන් නොමැත."
-                : "සිසුන් නොමැත."
-              : "ගැලපෙන ප්‍රතිඵල නොමැත."}
-          </p>
+          <EmptyState
+            isEmpty={list.length === 0}
+            tab={tab}
+            onAdd={() => setCreateOpen(true)}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-160 text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+              <thead className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="px-5 py-3 font-medium">නම</th>
-                  <th className="px-5 py-3 font-medium">විද්‍යුත් තැපෑල</th>
-                  <th className="px-5 py-3 font-medium">පාසල</th>
-                  <th className="px-5 py-3 font-medium">කාර්යභාරය</th>
-                  <th className="px-5 py-3 text-right font-medium">ක්‍රියා</th>
+                  <th className="px-5 py-3">Name</th>
+                  <th className="px-5 py-3">Email</th>
+                  <th className="px-5 py-3">School</th>
+                  <th className="px-5 py-3">Role</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -278,59 +317,76 @@ export default function SuperAdminPage() {
                   const isMe = u.id === me;
                   const isSuper = u.is_super_admin;
                   return (
-                    <tr key={u.id} className="hover:bg-slate-50">
-                      <td className="px-5 py-3 font-medium text-slate-800">
-                        {u.full_name || "—"}
-                        {isMe && (
-                          <span className="ml-2 text-xs font-semibold text-brand-600">
-                            (ඔබ)
+                    <tr
+                      key={u.id}
+                      className={`transition ${
+                        isMe ? "bg-amber-50/40" : "hover:bg-slate-50/60"
+                      }`}
+                    >
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-slate-800">
+                            {u.full_name || "—"}
                           </span>
-                        )}
+                          {isMe && (
+                            <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                              You
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-5 py-3 text-slate-600">{u.email}</td>
-                      <td className="max-w-50 truncate px-5 py-3 text-slate-600">
+                      <td className="max-w-55 truncate px-5 py-3.5 text-slate-600">
+                        {u.email}
+                      </td>
+                      <td className="max-w-50 truncate px-5 py-3.5 text-slate-600">
                         {u.school || "—"}
                       </td>
-                      <td className="px-5 py-3">
-                        {isSuper ? (
-                          <span className="badge bg-amber-50 text-amber-700">
-                            <Crown className="h-3 w-3" /> Super Admin
-                          </span>
-                        ) : u.is_admin ? (
-                          <span className="badge bg-brand-50 text-brand-700">
-                            <ShieldCheck className="h-3 w-3" /> Admin
-                          </span>
-                        ) : (
-                          <span className="badge bg-slate-100 text-slate-600">
-                            Student
-                          </span>
-                        )}
+                      <td className="px-5 py-3.5">
+                        <RoleBadge
+                          isAdmin={u.is_admin}
+                          isSuper={u.is_super_admin}
+                        />
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-5 py-3.5">
                         <div className="flex items-center justify-end gap-1">
                           {tab === "students" && (
                             <button
-                              onClick={() => setConfirm({ kind: "promote", user: u })}
-                              className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-brand-50 hover:text-brand-600"
-                              title="පරිපාලකයෙකු කරන්න"
+                              onClick={() =>
+                                setConfirm({ kind: "promote", user: u })
+                              }
+                              className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-sky-50 hover:text-sky-600 active:scale-95"
+                              title="Promote to admin"
+                              aria-label="Promote to admin"
                             >
                               <UserCog className="h-4 w-4" />
                             </button>
                           )}
                           {tab === "admins" && !isSuper && !isMe && (
                             <button
-                              onClick={() => setConfirm({ kind: "demote", user: u })}
-                              className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-amber-50 hover:text-amber-600"
-                              title="පහත හෙළන්න"
+                              onClick={() =>
+                                setConfirm({ kind: "demote", user: u })
+                              }
+                              className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-amber-50 hover:text-amber-600 active:scale-95"
+                              title="Demote to student"
+                              aria-label="Demote to student"
                             >
                               <ShieldOff className="h-4 w-4" />
                             </button>
                           )}
                           <button
-                            onClick={() => setConfirm({ kind: "delete", user: u })}
+                            onClick={() =>
+                              setConfirm({ kind: "delete", user: u })
+                            }
                             disabled={isMe || isSuper}
-                            className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
-                            title="මකන්න"
+                            className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-500"
+                            title={
+                              isSuper
+                                ? "Cannot delete a super admin"
+                                : isMe
+                                  ? "Cannot delete yourself"
+                                  : "Delete user"
+                            }
+                            aria-label="Delete user"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -345,7 +401,7 @@ export default function SuperAdminPage() {
         )}
       </div>
 
-      {/* Create admin modal */}
+      {/* ============ Create admin modal ============ */}
       {createOpen && (
         <CreateAdminModal
           onClose={() => setCreateOpen(false)}
@@ -357,7 +413,7 @@ export default function SuperAdminPage() {
         />
       )}
 
-      {/* Confirm dialog */}
+      {/* ============ Confirm dialog ============ */}
       {confirm && (
         <ConfirmDialog
           state={confirm}
@@ -366,6 +422,38 @@ export default function SuperAdminPage() {
         />
       )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Role badge                                                        */
+/* ------------------------------------------------------------------ */
+
+function RoleBadge({
+  isAdmin,
+  isSuper,
+}: {
+  isAdmin: boolean;
+  isSuper: boolean;
+}) {
+  if (isSuper) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+        <Crown className="h-2.5 w-2.5" /> Super Admin
+      </span>
+    );
+  }
+  if (isAdmin) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700">
+        <ShieldCheck className="h-2.5 w-2.5" /> Admin
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+      Student
+    </span>
   );
 }
 
@@ -384,56 +472,76 @@ function ConfirmDialog({
 }) {
   const copy = {
     promote: {
-      icon: <UserCog className="h-6 w-6" />,
-      tone: "bg-brand-100 text-brand-600",
-      title: "පරිපාලකයෙකු කරන්නද?",
-      desc: "මෙම සිසුවාට ප්‍රශ්න බැංකුව සහ ප්‍රශ්නාවලි කළමනාකරණය කිරීමට අවසර ලැබේ.",
-      cta: "පරිපාලකයෙකු කරන්න",
+      icon: <UserCheck className="h-6 w-6" />,
+      tone: "bg-sky-100 text-sky-600",
+      title: "Promote to admin?",
+      desc: "This student will be able to manage the question bank and quizzes.",
+      cta: "Promote",
+      ctaClass:
+        "bg-sky-500 hover:bg-sky-600 shadow-sm shadow-sky-500/25",
     },
     demote: {
-      icon: <ShieldOff className="h-6 w-6" />,
+      icon: <UserMinus className="h-6 w-6" />,
       tone: "bg-amber-100 text-amber-600",
-      title: "පහත හෙළන්නද?",
-      desc: "මෙම පරිපාලකයාට සිසු අයිතිවාසිකම් වලට පමණක් ප්‍රවේශය ලැබේ.",
-      cta: "පහත හෙළන්න",
+      title: "Demote to student?",
+      desc: "This admin will lose all admin privileges and become a regular student.",
+      cta: "Demote",
+      ctaClass:
+        "bg-amber-500 hover:bg-amber-600 shadow-sm shadow-amber-500/25",
     },
     delete: {
       icon: <Trash2 className="h-6 w-6" />,
       tone: "bg-red-100 text-red-600",
-      title: "සම්පූර්ණයෙන් මකන්නද?",
-      desc: "ගිණුම, ප්‍රතිඵල සහ සියලු දත්ත ස්ථීරව මකා දැමේ. ප්‍රතිවර්තනය කළ නොහැක.",
-      cta: "මකන්න",
+      title: "Delete this user?",
+      desc: "The account, quiz results, and all associated data will be permanently deleted. This can't be undone.",
+      cta: "Delete",
+      ctaClass:
+        "bg-red-600 hover:bg-red-700 shadow-sm shadow-red-500/25",
     },
   }[state.kind];
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4"
+      className="fixed inset-0 z-50 grid place-items-center bg-slate-900/60 p-4 backdrop-blur-sm"
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
+        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-900/5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-center">
-          <div className={`mx-auto grid h-12 w-12 place-items-center rounded-full ${copy.tone}`}>
+          <div
+            className={`mx-auto grid h-12 w-12 place-items-center rounded-full ${copy.tone}`}
+          >
             {copy.icon}
           </div>
-          <h2 className="mt-4 text-lg font-bold text-slate-900">{copy.title}</h2>
-          <p className="mt-1 text-sm text-slate-600">{copy.desc}</p>
-          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
-            <span className="font-semibold">{state.user.full_name}</span>
-            <br />
-            <span className="text-slate-500">{state.user.email}</span>
+          <h2 className="mt-4 text-lg font-bold tracking-tight text-slate-900">
+            {copy.title}
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            {copy.desc}
           </p>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-left">
+            <div className="truncate text-sm font-semibold text-slate-800">
+              {state.user.full_name}
+            </div>
+            <div className="truncate text-xs text-slate-500">
+              {state.user.email}
+            </div>
+          </div>
         </div>
+
         <div className="mt-5 flex gap-2">
-          <button onClick={onCancel} className="btn-outline flex-1">
-            අවලංගු
+          <button
+            onClick={onCancel}
+            className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
+          >
+            Cancel
           </button>
           <button
             onClick={onConfirm}
-            className={state.kind === "delete" ? "btn-danger flex-1" : "btn-primary flex-1"}
+            className={`inline-flex flex-1 items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98] ${copy.ctaClass}`}
           >
             {copy.cta}
           </button>
@@ -488,37 +596,50 @@ function CreateAdminModal({
     setSaving(false);
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setError(j.error ?? "නිර්මාණය අසාර්ථකයි");
+      setError(j.error ?? "Failed to create admin");
       return;
     }
     onCreated();
   }
 
+  const inputBase =
+    "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100";
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 p-4">
-      <div className="mx-auto my-8 w-full max-w-md rounded-xl bg-white shadow-xl">
-        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <div className="flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-100 text-brand-600">
-              <ShieldCheck className="h-4 w-4" />
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-3 backdrop-blur-sm sm:p-4">
+      <div className="mx-auto my-4 w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5 sm:my-8">
+        {/* Header */}
+        <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600">
+              <ShieldCheck className="h-5 w-5" />
             </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900">නව පරිපාලකයෙක්</h2>
-              <p className="text-[11px] text-slate-500">Create a new admin account</p>
+            <div className="min-w-0">
+              <h2 className="text-base font-bold tracking-tight text-slate-900">
+                New admin
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Create an admin account
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
         </header>
 
-        <form onSubmit={submit} className="space-y-4 px-5 py-5">
-          <Field icon={<User className="h-4 w-4" />} si="සම්පූර්ණ නම" en="Full name">
+        <form onSubmit={submit} className="space-y-4 px-4 py-5 sm:px-5">
+          <Field
+            icon={<User className="h-4 w-4" />}
+            label="Full name"
+            required
+          >
             <input
-              className="input pl-9"
+              className={`${inputBase} pl-10`}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
@@ -526,24 +647,33 @@ function CreateAdminModal({
             />
           </Field>
 
-          <Field icon={<Mail className="h-4 w-4" />} si="විද්‍යුත් තැපෑල" en="Email">
+          <Field icon={<Mail className="h-4 w-4" />} label="Email" required>
             <input
               type="email"
-              className="input pl-9"
+              className={`${inputBase} pl-10`}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </Field>
 
-          <Field icon={<SchoolIcon className="h-4 w-4" />} si="පාසල" en="School (optional)">
+          <Field
+            icon={<SchoolIcon className="h-4 w-4" />}
+            label="School"
+            hint="Optional"
+          >
             <SchoolAutocomplete value={school} onChange={setSchool} />
           </Field>
 
-          <Field icon={<Lock className="h-4 w-4" />} si="මුරපදය" en="Password (min 6)">
+          <Field
+            icon={<Lock className="h-4 w-4" />}
+            label="Password"
+            hint="Min 6 characters"
+            required
+          >
             <input
               type={showPw ? "text" : "password"}
-              className="input pl-9 pr-20"
+              className={`${inputBase} pl-10 pr-20`}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -551,30 +681,57 @@ function CreateAdminModal({
             <button
               type="button"
               onClick={() => setShowPw((v) => !v)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs font-medium text-slate-500 hover:text-slate-800"
+              className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              aria-label={showPw ? "Hide password" : "Show password"}
             >
-              {showPw ? "සඟවන්න" : "පෙන්වන්න"}
+              {showPw ? (
+                <>
+                  <EyeOff className="h-3.5 w-3.5" />
+                  Hide
+                </>
+              ) : (
+                <>
+                  <Eye className="h-3.5 w-3.5" />
+                  Show
+                </>
+              )}
             </button>
           </Field>
 
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            මෙම ගිණුම වහාම සක්‍රීය වේ. ඊමේල් තහවුරු කිරීමක් අවශ්‍ය නැත.
-            මුරපදය ආරක්ෂිතව බෙදාගන්න.
-          </p>
+          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-xs leading-relaxed text-amber-800">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              This account activates immediately — no email confirmation
+              required. Share the password securely.
+            </span>
+          </div>
 
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="btn-outline">
-              අවලංගු
+          <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+            >
+              Cancel
             </button>
-            <button type="submit" disabled={!valid || saving} className="btn-primary">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              {saving ? "නිර්මාණය කරමින්..." : "පරිපාලකයෙකු සාදන්න"}
+            <button
+              type="submit"
+              disabled={!valid || saving}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none sm:flex-none"
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              {saving ? "Creating…" : "Create admin"}
             </button>
           </div>
         </form>
@@ -583,29 +740,96 @@ function CreateAdminModal({
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Field wrapper                                                     */
+/* ------------------------------------------------------------------ */
+
 function Field({
   icon,
-  si,
-  en,
+  label,
+  hint,
+  required,
   children,
 }: {
   icon: React.ReactNode;
-  si: string;
-  en: string;
+  label: string;
+  hint?: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="block">
-      <div className="mb-1.5 flex items-baseline justify-between">
-        <span className="text-sm font-medium text-slate-800">{si}</span>
-        <span className="text-[11px] text-slate-400">{en}</span>
+      <div className="mb-1.5 flex items-baseline justify-between gap-3">
+        <span className="text-[13px] font-semibold text-slate-800">
+          {label}
+          {required && <span className="ml-0.5 text-red-500">*</span>}
+        </span>
+        {hint && (
+          <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+            {hint}
+          </span>
+        )}
       </div>
       <div className="relative">
-        <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-400">
+        <span className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-slate-400">
           {icon}
         </span>
         {children}
       </div>
     </label>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Empty state                                                       */
+/* ------------------------------------------------------------------ */
+
+function EmptyState({
+  isEmpty,
+  tab,
+  onAdd,
+}: {
+  isEmpty: boolean;
+  tab: Tab;
+  onAdd: () => void;
+}) {
+  const isAdmins = tab === "admins";
+
+  return (
+    <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
+      <div className="grid h-14 w-14 place-items-center rounded-full bg-slate-100 text-slate-400">
+        {isEmpty ? (
+          isAdmins ? (
+            <ShieldCheck className="h-6 w-6" />
+          ) : (
+            <UsersIcon className="h-6 w-6" />
+          )
+        ) : (
+          <Search className="h-6 w-6" />
+        )}
+      </div>
+      <h3 className="mt-2 font-semibold text-slate-800">
+        {isEmpty
+          ? isAdmins
+            ? "No admins yet"
+            : "No students yet"
+          : "No matches found"}
+      </h3>
+      <p className="max-w-sm text-sm text-slate-500">
+        {isEmpty
+          ? isAdmins
+            ? "Create your first admin account to delegate quiz management."
+            : "Students will appear here once they register."
+          : "Try a different name, email, or school."}
+      </p>
+      {isEmpty && isAdmins && (
+        <button
+          onClick={onAdd}
+          className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+        >
+          <Plus className="h-4 w-4" /> Create first admin
+        </button>
+      )}
+    </div>
   );
 }

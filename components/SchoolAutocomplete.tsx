@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, MapPin, Check, Plus } from "lucide-react";
+import { Search, MapPin, Plus, School as SchoolIcon, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                             */
+/* ------------------------------------------------------------------ */
 
 interface School {
   id: number;
@@ -17,10 +21,14 @@ interface Props {
   required?: boolean;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Component                                                         */
+/* ------------------------------------------------------------------ */
+
 export default function SchoolAutocomplete({
   value,
   onChange,
-  placeholder = "ඔබේ පාසලේ නම ලියන්න...",
+  placeholder = "Start typing your school name…",
   required,
 }: Props) {
   const [query, setQuery] = useState(value);
@@ -31,13 +39,18 @@ export default function SchoolAutocomplete({
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keep local input in sync if parent resets value
-  useEffect(() => { setQuery(value); }, [value]);
+  /* Keep local input in sync if parent resets value */
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
 
-  // Debounced search
+  /* Debounced search */
   useEffect(() => {
     if (!open) return;
-    if (query.trim().length < 2) { setResults([]); return; }
+    if (query.trim().length < 2) {
+      setResults([]);
+      return;
+    }
 
     const t = setTimeout(async () => {
       setLoading(true);
@@ -55,7 +68,7 @@ export default function SchoolAutocomplete({
     return () => clearTimeout(t);
   }, [query, open]);
 
-  // Close on outside click
+  /* Close on outside click */
   useEffect(() => {
     function onDoc(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
@@ -91,19 +104,23 @@ export default function SchoolAutocomplete({
     }
   }
 
+  const trimmed = query.trim();
   const showAddRow =
-    query.trim().length >= 2 &&
+    trimmed.length >= 2 &&
     !loading &&
-    !results.some((r) => r.name.toLowerCase() === query.trim().toLowerCase());
+    !results.some((r) => r.name.toLowerCase() === trimmed.toLowerCase());
+
+  const showDropdown = open && trimmed.length >= 2;
 
   return (
     <div ref={wrapRef} className="relative">
+      {/* ---------- Input ---------- */}
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           ref={inputRef}
           type="text"
-          className="input pl-9"
+          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
           value={query}
           required={required}
           placeholder={placeholder}
@@ -116,55 +133,99 @@ export default function SchoolAutocomplete({
           }}
           onKeyDown={onKeyDown}
         />
+        {loading && (
+          <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-sky-500" />
+        )}
       </div>
 
-      {open && query.trim().length >= 2 && (
-        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-          {loading && (
-            <div className="px-3 py-2 text-xs text-slate-500">සොයමින්...</div>
+      {/* ---------- Dropdown ---------- */}
+      {showDropdown && (
+        <div className="absolute left-0 right-0 z-30 mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5 ring-1 ring-slate-900/5">
+          {/* Loading (only if no results yet) */}
+          {loading && results.length === 0 && (
+            <div className="flex items-center gap-2 px-3 py-3 text-xs text-slate-500">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-500" />
+              Searching schools…
+            </div>
           )}
 
-          {!loading && results.length > 0 && (
+          {/* Result list */}
+          {results.length > 0 && (
             <ul className="max-h-64 overflow-auto py-1">
-              {results.map((s, i) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => selectSchool(s.name)}
-                    onMouseEnter={() => setHighlight(i)}
-                    className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${
-                      i === highlight ? "bg-brand-50" : "hover:bg-slate-50"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                      <span className="text-slate-900">{s.name}</span>
-                    </span>
-                    {s.district && (
-                      <span className="text-xs text-slate-500">{s.district}</span>
-                    )}
-                  </button>
-                </li>
-              ))}
+              {results.map((s, i) => {
+                const active = i === highlight;
+                return (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectSchool(s.name)}
+                      onMouseEnter={() => setHighlight(i)}
+                      className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition ${
+                        active ? "bg-sky-50" : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span
+                          className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition ${
+                            active
+                              ? "bg-sky-100 text-sky-600"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          <SchoolIcon className="h-3.5 w-3.5" />
+                        </span>
+                        <span
+                          className={`truncate text-sm ${
+                            active
+                              ? "font-semibold text-sky-900"
+                              : "font-medium text-slate-800"
+                          }`}
+                        >
+                          {s.name}
+                        </span>
+                      </span>
+
+                      {s.district && (
+                        <span
+                          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            active
+                              ? "bg-sky-100 text-sky-700"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          <MapPin className="h-2.5 w-2.5" />
+                          {s.district}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
 
+          {/* Add custom entry */}
           {showAddRow && (
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => selectSchool(query.trim())}
-              className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-left text-sm text-brand-700 hover:bg-brand-50"
+              onClick={() => selectSchool(trimmed)}
+              className="flex w-full items-center gap-2 border-t border-slate-100 bg-slate-50/50 px-3 py-2.5 text-left text-sm font-medium text-sky-700 transition hover:bg-sky-50"
             >
-              <Plus className="h-3.5 w-3.5" />
-              &ldquo;{query.trim()}&rdquo; ලෙස එක් කරන්න
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-sky-100 text-sky-600">
+                <Plus className="h-3.5 w-3.5" />
+              </span>
+              <span className="min-w-0 truncate">
+                Use &ldquo;<span className="font-semibold">{trimmed}</span>&rdquo;
+              </span>
             </button>
           )}
 
+          {/* Empty state */}
           {!loading && results.length === 0 && !showAddRow && (
-            <div className="px-3 py-2 text-xs text-slate-500">
-              පාසලක් හමු නොවීය.
+            <div className="px-3 py-4 text-center text-xs text-slate-500">
+              No schools match &ldquo;{trimmed}&rdquo;
             </div>
           )}
         </div>

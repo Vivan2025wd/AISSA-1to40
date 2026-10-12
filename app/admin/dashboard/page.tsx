@@ -11,9 +11,15 @@ import {
   Clock,
   BookOpen,
   ChevronRight,
+  AlertTriangle,
+  Inbox,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getQuizWindow } from "@/lib/quiz-window";
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                             */
+/* ------------------------------------------------------------------ */
 
 interface Snapshot {
   questions: number;
@@ -39,29 +45,50 @@ interface Snapshot {
   }[];
 }
 
+/* ------------------------------------------------------------------ */
+/*  Page                                                              */
+/* ------------------------------------------------------------------ */
+
 export default function AdminDashboard() {
   const [data, setData] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       const [
-        qCount, sCount, qzCount, pubCount, rCount,
-        recentRes, topicsRes, upcomingRes,
+        qCount,
+        sCount,
+        qzCount,
+        pubCount,
+        rCount,
+        recentRes,
+        topicsRes,
+        upcomingRes,
       ] = await Promise.all([
         supabase.from("questions").select("id", { count: "exact", head: true }),
-        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_admin", false),
+        supabase
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("is_admin", false),
         supabase.from("quizzes").select("id", { count: "exact", head: true }),
-        supabase.from("quizzes").select("id", { count: "exact", head: true }).eq("is_published", true),
-        supabase.from("quiz_results").select("id", { count: "exact", head: true }),
+        supabase
+          .from("quizzes")
+          .select("id", { count: "exact", head: true })
+          .eq("is_published", true),
+        supabase
+          .from("quiz_results")
+          .select("id", { count: "exact", head: true }),
 
         supabase
           .from("quiz_results")
-          .select(`
+          .select(
+            `
             id, score, total, submitted_at,
             profile:profiles (full_name, school),
             quiz:quizzes (title)
-          `)
+          `
+          )
           .order("submitted_at", { ascending: false })
           .limit(8),
 
@@ -73,6 +100,17 @@ export default function AdminDashboard() {
           .order("scheduled_at", { ascending: true })
           .limit(5),
       ]);
+
+      if (recentRes.error || topicsRes.error || upcomingRes.error) {
+        setError(
+          recentRes.error?.message ??
+            topicsRes.error?.message ??
+            upcomingRes.error?.message ??
+            "Failed to load dashboard"
+        );
+        setLoading(false);
+        return;
+      }
 
       const topicMap = new Map<string, number>();
       for (const row of topicsRes.data ?? []) {
@@ -97,51 +135,124 @@ export default function AdminDashboard() {
     })();
   }, []);
 
+  /* ---------- Loading ---------- */
   if (loading) {
     return (
       <div className="grid min-h-[60vh] place-items-center">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+        <div className="flex flex-col items-center gap-2 text-slate-500">
+          <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
+          <span className="text-sm">Loading overview…</span>
+        </div>
       </div>
     );
   }
-  if (!data) return null;
+
+  /* ---------- Error ---------- */
+  if (error || !data) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-600">
+          <AlertTriangle className="h-6 w-6" />
+        </div>
+        <h2 className="mt-4 text-lg font-semibold text-slate-900">
+          Failed to load dashboard
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">
+          {error ?? "Unknown error"}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">සාරාංශය</h1>
-      <p className="mt-1 text-sm text-slate-600">Platform overview at a glance</p>
+      {/* ============ Header ============ */}
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+          Overview
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Platform at a glance
+        </p>
+      </header>
 
-      {/* Stat cards */}
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Stat icon={<Library className="h-5 w-5" />} label="ප්‍රශ්න" en="Questions" value={data.questions} tone="blue" />
-        <Stat icon={<Users className="h-5 w-5" />} label="සිසුන්" en="Students" value={data.students} tone="green" />
-        <Stat icon={<CalendarClock className="h-5 w-5" />} label="ප්‍රශ්නාවලි" en="Quizzes" value={data.quizzes} tone="amber" />
-        <Stat icon={<BookOpen className="h-5 w-5" />} label="ප්‍රකාශිත" en="Published" value={data.published} tone="purple" />
-        <Stat icon={<TrendingUp className="h-5 w-5" />} label="සම්පූර්ණ" en="Submissions" value={data.results} tone="rose" />
+      {/* ============ Stat cards ============ */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <Stat
+          icon={<Library className="h-5 w-5" />}
+          label="Questions"
+          value={data.questions}
+          tone="sky"
+        />
+        <Stat
+          icon={<Users className="h-5 w-5" />}
+          label="Students"
+          value={data.students}
+          tone="emerald"
+        />
+        <Stat
+          icon={<CalendarClock className="h-5 w-5" />}
+          label="Quizzes"
+          value={data.quizzes}
+          tone="amber"
+        />
+        <Stat
+          icon={<BookOpen className="h-5 w-5" />}
+          label="Published"
+          value={data.published}
+          tone="violet"
+        />
+        <Stat
+          icon={<TrendingUp className="h-5 w-5" />}
+          label="Submissions"
+          value={data.results}
+          tone="rose"
+        />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {/* Topics */}
-        <section className="card lg:col-span-1">
+      {/* ============ Two-column: topics + upcoming ============ */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        {/* ---- Topics ---- */}
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:col-span-1">
           <div className="border-b border-slate-100 px-5 py-4">
-            <h2 className="font-semibold text-slate-900">විෂය ප්‍රමාණය</h2>
-            <p className="text-xs text-slate-500">Question count by topic</p>
+            <h2 className="text-sm font-bold tracking-tight text-slate-900">
+              Topics
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Question distribution
+            </p>
           </div>
+
           <div className="p-5">
             {data.topics.length === 0 ? (
-              <p className="text-sm text-slate-500">තවම ප්‍රශ්න නොමැත.</p>
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-400">
+                  <Library className="h-5 w-5" />
+                </div>
+                <p className="text-xs text-slate-500">No questions yet</p>
+              </div>
             ) : (
-              <ul className="space-y-3">
+              <ul className="space-y-4">
                 {data.topics.map((t) => {
-                  const pct = data.questions > 0 ? (t.count / data.questions) * 100 : 0;
+                  const pct =
+                    data.questions > 0
+                      ? (t.count / data.questions) * 100
+                      : 0;
                   return (
                     <li key={t.topic}>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-slate-800">{t.topic}</span>
-                        <span className="text-slate-500">{t.count}</span>
+                      <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                        <span className="text-sm font-medium text-slate-800">
+                          {t.topic}
+                        </span>
+                        <span className="text-xs font-semibold tabular-nums text-slate-500">
+                          {t.count}
+                        </span>
                       </div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full bg-brand-500" style={{ width: `${pct}%` }} />
+                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-linear-to-r from-sky-500 to-sky-400 transition-all duration-300"
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
                     </li>
                   );
@@ -151,156 +262,264 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* Upcoming quizzes */}
-        <section className="card lg:col-span-2">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        {/* ---- Upcoming quizzes ---- */}
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:col-span-2">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <div>
-              <h2 className="font-semibold text-slate-900">ඉදිරි ප්‍රශ්නාවලි</h2>
-              <p className="text-xs text-slate-500">Next scheduled sessions</p>
+              <h2 className="text-sm font-bold tracking-tight text-slate-900">
+                Upcoming quizzes
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Next scheduled sessions
+              </p>
             </div>
-            <Link href="/admin/quizzes" className="text-xs font-semibold text-brand-600 hover:underline">
-              සියල්ල
+            <Link
+              href="/admin/quizzes"
+              className="shrink-0 text-xs font-semibold text-sky-600 transition hover:text-sky-700 hover:underline"
+            >
+              View all
             </Link>
           </div>
-          <div className="divide-y divide-slate-100">
-            {data.upcoming.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-slate-500">ප්‍රශ්නාවලි නොමැත.</p>
-            ) : (
-              data.upcoming.map((q) => {
+
+          {data.upcoming.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
+              <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-400">
+                <CalendarClock className="h-5 w-5" />
+              </div>
+              <p className="text-xs text-slate-500">
+                No upcoming quizzes scheduled
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {data.upcoming.map((q) => {
                 const w = getQuizWindow(q.scheduled_at, q.duration_minutes);
                 return (
-                  <Link
-                    key={q.id}
-                    href={`/admin/quizzes/${q.id}/questions`}
-                    className="flex items-center justify-between gap-3 px-5 py-3.5 hover:bg-slate-50"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-slate-800">{q.title}</div>
-                      <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
-                        <Clock className="h-3 w-3" />
-                        {new Date(q.scheduled_at).toLocaleString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                  <li key={q.id}>
+                    <Link
+                      href={`/admin/quizzes/${q.id}/questions`}
+                      className="group flex items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-slate-50/70"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-slate-800">
+                          {q.title}
+                        </div>
+                        <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                          <Clock className="h-3 w-3" />
+                          <span className="tabular-nums">
+                            {new Date(q.scheduled_at).toLocaleString("en-GB", {
+                              day: "2-digit",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          <span className="text-slate-300">·</span>
+                          <span>{q.duration_minutes} min</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {!q.is_published ? (
-                        <span className="badge bg-slate-100 text-slate-600">කෙටුම්පත</span>
-                      ) : w.status === "active" ? (
-                        <span className="badge bg-green-50 text-green-700">සක්‍රීය</span>
-                      ) : w.status === "upcoming" ? (
-                        <span className="badge bg-amber-50 text-amber-700">ඉදිරියේ</span>
-                      ) : (
-                        <span className="badge bg-slate-100 text-slate-600">අවසන්</span>
-                      )}
-                      <ChevronRight className="h-4 w-4 text-slate-400" />
-                    </div>
-                  </Link>
+
+                      <div className="flex shrink-0 items-center gap-2">
+                        <QuizStatusBadge
+                          isPublished={q.is_published}
+                          status={w.status}
+                        />
+                        <ChevronRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-sky-500" />
+                      </div>
+                    </Link>
+                  </li>
                 );
-              })
-            )}
-          </div>
+              })}
+            </ul>
+          )}
         </section>
       </div>
 
-      {/* Recent submissions */}
-      <section className="card mt-6">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+      {/* ============ Recent submissions ============ */}
+      <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div>
-            <h2 className="font-semibold text-slate-900">නවතම ඉදිරිපත් කිරීම්</h2>
-            <p className="text-xs text-slate-500">Latest student submissions</p>
+            <h2 className="text-sm font-bold tracking-tight text-slate-900">
+              Recent submissions
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Latest student attempts
+            </p>
           </div>
-          <Link href="/admin/performance" className="text-xs font-semibold text-brand-600 hover:underline">
-            සියල්ල
+          <Link
+            href="/admin/performance"
+            className="shrink-0 text-xs font-semibold text-sky-600 transition hover:text-sky-700 hover:underline"
+          >
+            View all
           </Link>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-140 text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-5 py-3 font-medium">සිසුවා</th>
-                <th className="px-5 py-3 font-medium">පාසල</th>
-                <th className="px-5 py-3 font-medium">ප්‍රශ්නාවලිය</th>
-                <th className="px-5 py-3 text-right font-medium">ලකුණු</th>
-                <th className="px-5 py-3 text-right font-medium">දිනය</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {data.recent.length === 0 ? (
+
+        {data.recent.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 px-5 py-14 text-center">
+            <div className="grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-400">
+              <Inbox className="h-6 w-6" />
+            </div>
+            <p className="text-sm font-medium text-slate-700">
+              No submissions yet
+            </p>
+            <p className="text-xs text-slate-500">
+              Student attempts will show up here.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-140 text-sm">
+              <thead className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-slate-500">
-                    තවම ඉදිරිපත් කිරීම් නොමැත.
-                  </td>
+                  <th className="px-5 py-3">Student</th>
+                  <th className="px-5 py-3">School</th>
+                  <th className="px-5 py-3">Quiz</th>
+                  <th className="px-5 py-3 text-right">Score</th>
+                  <th className="px-5 py-3 text-right">Date</th>
                 </tr>
-              ) : (
-                data.recent.map((r) => {
-                  const pct = r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.recent.map((r) => {
+                  const pct =
+                    r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
                   return (
-                    <tr key={r.id}>
-                      <td className="px-5 py-3 font-medium text-slate-800">
+                    <tr
+                      key={r.id}
+                      className="transition hover:bg-slate-50/60"
+                    >
+                      <td className="px-5 py-3.5 font-medium text-slate-800">
                         {r.profile?.full_name ?? "—"}
                       </td>
-                      <td className="px-5 py-3 text-slate-600">{r.profile?.school ?? "—"}</td>
-                      <td className="max-w-55 truncate px-5 py-3 text-slate-600">
+                      <td className="max-w-55 truncate px-5 py-3.5 text-slate-600">
+                        {r.profile?.school ?? "—"}
+                      </td>
+                      <td className="max-w-55 truncate px-5 py-3.5 text-slate-600">
                         {r.quiz?.title ?? "—"}
                       </td>
-                      <td className="px-5 py-3 text-right">
-                        <span
-                          className={`badge ${
-                            pct >= 75
-                              ? "bg-green-50 text-green-700"
-                              : pct >= 50
-                                ? "bg-amber-50 text-amber-700"
-                                : "bg-red-50 text-red-700"
-                          }`}
-                        >
-                          {r.score}/{r.total}
-                        </span>
+                      <td className="px-5 py-3.5 text-right">
+                        <ScoreBadge score={r.score} total={r.total} pct={pct} />
                       </td>
-                      <td className="whitespace-nowrap px-5 py-3 text-right text-slate-500">
-                        {new Date(r.submitted_at).toLocaleDateString("en-GB")}
+                      <td className="whitespace-nowrap px-5 py-3.5 text-right text-xs tabular-nums text-slate-500">
+                        {new Date(r.submitted_at).toLocaleDateString("en-GB", {
+                          day: "2-digit",
+                          month: "short",
+                        })}
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Stat card                                                         */
+/* ------------------------------------------------------------------ */
+
 function Stat({
   icon,
   label,
-  en,
   value,
   tone,
 }: {
   icon: React.ReactNode;
   label: string;
-  en: string;
   value: number;
-  tone: "blue" | "green" | "amber" | "purple" | "rose";
+  tone: "sky" | "emerald" | "amber" | "violet" | "rose";
 }) {
   const tones = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-green-50 text-green-600",
+    sky: "bg-sky-50 text-sky-600",
+    emerald: "bg-emerald-50 text-emerald-600",
     amber: "bg-amber-50 text-amber-600",
-    purple: "bg-purple-50 text-purple-600",
+    violet: "bg-violet-50 text-violet-600",
     rose: "bg-rose-50 text-rose-600",
   } as const;
+
   return (
-    <div className="card p-4">
-      <div className={`grid h-9 w-9 place-items-center rounded-lg ${tones[tone]}`}>{icon}</div>
-      <div className="mt-3 text-2xl font-bold text-slate-900">{value}</div>
-      <div className="mt-0.5 text-xs font-medium text-slate-700">{label}</div>
-      <div className="text-[10px] uppercase tracking-wide text-slate-400">{en}</div>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+      <div className={`grid h-9 w-9 place-items-center rounded-xl ${tones[tone]}`}>
+        {icon}
+      </div>
+      <div className="mt-3 text-2xl font-bold tabular-nums tracking-tight text-slate-900">
+        {value}
+      </div>
+      <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+        {label}
+      </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Quiz status badge                                                 */
+/* ------------------------------------------------------------------ */
+
+function QuizStatusBadge({
+  isPublished,
+  status,
+}: {
+  isPublished: boolean;
+  status: "upcoming" | "active" | "expired";
+}) {
+  if (!isPublished) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+        Draft
+      </span>
+    );
+  }
+  if (status === "active") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+        Live
+      </span>
+    );
+  }
+  if (status === "upcoming") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+        <Clock className="h-2.5 w-2.5" />
+        Soon
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+      Closed
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Score badge                                                       */
+/* ------------------------------------------------------------------ */
+
+function ScoreBadge({
+  score,
+  total,
+  pct,
+}: {
+  score: number;
+  total: number;
+  pct: number;
+}) {
+  const tone =
+    pct >= 75
+      ? "bg-emerald-50 text-emerald-700"
+      : pct >= 50
+        ? "bg-amber-50 text-amber-700"
+        : "bg-red-50 text-red-700";
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${tone}`}
+    >
+      {score}/{total}
+    </span>
   );
 }
