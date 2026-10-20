@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Noto_Sans_Sinhala } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 /* ------------------------------------------------------------------ */
@@ -92,6 +93,7 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col bg-white text-slate-800 selection:bg-sky-200 selection:text-slate-900">
         {children}
+        <SpeedInsights />
       </body>
     </html>
   );
