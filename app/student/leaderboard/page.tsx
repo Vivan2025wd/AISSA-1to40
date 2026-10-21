@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Loader2,
   Trophy,
@@ -9,7 +9,7 @@ import {
   School as SchoolIcon,
   Search,
   AlertTriangle,
-  User,
+  RefreshCw,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -37,23 +37,58 @@ export default function LeaderboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
+  const load = useCallback(async () => {
+    return Promise.all([
+      supabase.rpc("get_student_leaderboard", { p_limit: 500 }),
+      supabase.auth.getUser(),
+    ]);
+  }, []);
+
   useEffect(() => {
-    (async () => {
-      const [{ data: lb, error: rpcErr }, { data: { user } }] = await Promise.all([
-        supabase.rpc("get_student_leaderboard", { p_limit: 500 }),
-        supabase.auth.getUser(),
-      ]);
-      if (rpcErr) setError(rpcErr.message);
-      else setRows((lb ?? []) as RankRow[]);
+    let cancelled = false;
+
+    const fetchLeaderboard = async () => {
+      const [{ data: lb, error: rpcErr }, { data: { user } }] = await load();
+      if (cancelled) return;
+
+      setError(null);
+      if (rpcErr) {
+        setError(rpcErr.message);
+        setLoading(false);
+        return;
+      }
+
+      setRows((lb ?? []) as RankRow[]);
       setMe(user?.id ?? null);
       setLoading(false);
-    })();
-  }, []);
+    };
+
+    void fetchLeaderboard();
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
+
+  const retry = useCallback(() => {
+    setLoading(true);
+    void load().then(([{ data: lb, error: rpcErr }, { data: { user } }]) => {
+      setError(null);
+      if (rpcErr) {
+        setError(rpcErr.message);
+        setLoading(false);
+        return;
+      }
+
+      setRows((lb ?? []) as RankRow[]);
+      setMe(user?.id ?? null);
+      setLoading(false);
+    });
+  }, [load]);
 
   /* ---------- Loading ---------- */
   if (loading) {
     return (
-      <div className="grid min-h-[60vh] place-items-center">
+      <div className="grid min-h-dvh place-items-center px-4">
         <div className="flex flex-col items-center gap-2 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
           <span className="text-sm">Loading leaderboard…</span>
@@ -65,16 +100,22 @@ export default function LeaderboardPage() {
   /* ---------- Error ---------- */
   if (error) {
     return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <div className="grid place-items-center">
-          <div className="grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-600">
+      <div className="grid min-h-dvh place-items-center px-4">
+        <div className="mx-auto max-w-md text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-600">
             <AlertTriangle className="h-6 w-6" />
           </div>
+          <h2 className="mt-4 text-lg font-semibold text-slate-900">
+            Failed to load leaderboard
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">{error}</p>
+          <button
+            onClick={retry}
+            className="mt-6 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] sm:py-2.5"
+          >
+            <RefreshCw className="h-4 w-4" /> Try again
+          </button>
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-slate-900">
-          Failed to load leaderboard
-        </h2>
-        <p className="mt-1 text-sm text-slate-600">{error}</p>
       </div>
     );
   }
@@ -127,7 +168,7 @@ export default function LeaderboardPage() {
               </div>
               <div className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-500">
                 <SchoolIcon className="h-3 w-3 shrink-0" />
-                {myRow.school}
+                <span className="truncate">{myRow.school}</span>
               </div>
             </div>
           </div>
@@ -145,10 +186,10 @@ export default function LeaderboardPage() {
 
       {/* ============ Search ============ */}
       <div className="relative mb-4">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           type="text"
-          className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+          className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:py-2.5"
           placeholder="Search by name or school…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -180,9 +221,7 @@ export default function LeaderboardPage() {
                     <tr
                       key={r.student_id}
                       className={`transition ${
-                        isMe
-                          ? "bg-sky-50/60"
-                          : "hover:bg-slate-50/60"
+                        isMe ? "bg-sky-50/60" : "hover:bg-slate-50/60"
                       }`}
                     >
                       <td className="px-5 py-3">
@@ -224,11 +263,11 @@ export default function LeaderboardPage() {
               return (
                 <div
                   key={r.student_id}
-                  className={`flex items-center gap-3 px-4 py-3.5 transition ${
+                  className={`flex items-center gap-3 px-4 py-4 transition ${
                     isMe ? "bg-sky-50/60" : ""
                   }`}
                 >
-                  <RankBadge rank={realIndex + 1} />
+                  <RankBadge rank={realIndex + 1} size="lg" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="truncate text-sm font-medium text-slate-800">
@@ -240,7 +279,7 @@ export default function LeaderboardPage() {
                         </span>
                       )}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-500">
+                    <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                       <SchoolIcon className="h-3 w-3 shrink-0" />
                       <span className="truncate">{r.school}</span>
                     </div>
@@ -265,37 +304,58 @@ export default function LeaderboardPage() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Sub-components                                                    */
+/*  Rank badge                                                        */
 /* ------------------------------------------------------------------ */
 
-function RankBadge({ rank }: { rank: number }) {
+function RankBadge({
+  rank,
+  size = "sm",
+}: {
+  rank: number;
+  size?: "sm" | "lg";
+}) {
+  const sizeClass =
+    size === "lg" ? "h-10 w-10 sm:h-9 sm:w-9" : "h-9 w-9";
+
   if (rank === 1) {
     return (
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 shadow-sm shadow-amber-500/10">
+      <span
+        className={`grid ${sizeClass} shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 shadow-sm shadow-amber-500/10`}
+      >
         <Crown className="h-4 w-4" />
       </span>
     );
   }
   if (rank === 2) {
     return (
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-200 text-slate-600">
+      <span
+        className={`grid ${sizeClass} shrink-0 place-items-center rounded-xl bg-slate-200 text-slate-600`}
+      >
         <Medal className="h-4 w-4" />
       </span>
     );
   }
   if (rank === 3) {
     return (
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-orange-100 text-orange-700">
+      <span
+        className={`grid ${sizeClass} shrink-0 place-items-center rounded-xl bg-orange-100 text-orange-700`}
+      >
         <Medal className="h-4 w-4" />
       </span>
     );
   }
   return (
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-50 text-sm font-semibold tabular-nums text-slate-500">
+    <span
+      className={`grid ${sizeClass} shrink-0 place-items-center rounded-xl bg-slate-50 text-sm font-semibold tabular-nums text-slate-500`}
+    >
       {rank}
     </span>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  Empty state                                                       */
+/* ------------------------------------------------------------------ */
 
 function EmptyState({ hasRows }: { hasRows: boolean }) {
   return (

@@ -10,7 +10,6 @@ import {
   User,
   School as SchoolIcon,
   Loader2,
-  CheckCircle2,
   Languages,
   ArrowLeft,
   AlertTriangle,
@@ -107,12 +106,12 @@ export default function RegisterPage() {
     "w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500";
 
   return (
-    <main className="grid min-h-screen place-items-center bg-linear-to-b from-sky-50 via-white to-slate-50 px-4 py-10 sm:px-5">
+    <main className="grid min-h-dvh place-items-center bg-linear-to-b from-sky-50 via-white to-slate-50 px-4 py-10 sm:px-5">
       <div className="w-full max-w-md">
         {/* ---------- Logo ---------- */}
         <Link
           href="/"
-          className="mb-6 flex items-center justify-center gap-2.5"
+          className="mb-6 flex items-center justify-center gap-2.5 transition active:scale-[0.98]"
         >
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-sky-500 text-white shadow-sm shadow-sky-500/30">
             <FlaskConical className="h-5 w-5" />
@@ -259,7 +258,7 @@ export default function RegisterPage() {
             {confirm.length > 0 && !matchOk && (
               <p className="flex items-center gap-1.5 text-xs text-amber-600">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                Passwords don't match.
+                Passwords don&apos;t match.
               </p>
             )}
 
@@ -275,7 +274,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={!formOk || loading}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none sm:py-3"
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {loading ? "Creating account…" : "Create account"}
@@ -295,10 +294,10 @@ export default function RegisterPage() {
         </div>
 
         {/* Back to home */}
-        <div className="mt-5 text-center">
+        <div className="mt-5 flex justify-center">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
           >
             <ArrowLeft className="h-3 w-3" />
             Back to home
@@ -403,8 +402,8 @@ function SuccessCard({
   onContinue: () => void;
 }) {
   return (
-    <main className="grid min-h-screen place-items-center bg-linear-to-b from-sky-50 via-white to-slate-50 px-4 sm:px-5">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+    <main className="grid min-h-dvh place-items-center bg-linear-to-b from-sky-50 via-white to-slate-50 px-4 sm:px-5">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
         <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-emerald-100 text-emerald-600">
           <MailCheck className="h-8 w-8" />
         </div>
@@ -412,19 +411,19 @@ function SuccessCard({
           Check your inbox
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
-          We've sent a confirmation link to{" "}
+          We&apos;ve sent a confirmation link to{" "}
           <span className="font-semibold text-slate-800">{email}</span>.
           Click it to activate your account, then sign in.
         </p>
 
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-left text-xs leading-relaxed text-amber-800">
-          <strong className="font-semibold">Didn't get it?</strong> Check your
+          <strong className="font-semibold">Didn&apos;t get it?</strong> Check your
           spam folder.
         </div>
 
         <button
           onClick={onContinue}
-          className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+          className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-sky-500 px-4 py-3.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:py-3"
         >
           Go to sign-in
         </button>

@@ -19,7 +19,7 @@ import { QUESTION_TOPICS, type QuestionTopic } from "./QuestionEntryForm";
 /*  Types                                                             */
 /* ------------------------------------------------------------------ */
 
-interface QuestionLite {
+export interface QuestionLite {
   id: string;
   topic: string;
   question_text_si: string;
@@ -27,13 +27,13 @@ interface QuestionLite {
 }
 
 interface Props {
-  quizId: string;
-  /** IDs already linked to this quiz (excluded from the list) */
+  /** IDs already selected (excluded from the list) */
   existingIds: string[];
   /** How many more questions can be added (20 - existing) */
   slotsLeft: number;
   onClose: () => void;
-  onAdded: (added: number) => void;
+  /** Returns the full objects of the selected questions */
+  onAdded: (questions: QuestionLite[]) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -41,7 +41,6 @@ interface Props {
 /* ------------------------------------------------------------------ */
 
 export default function QuestionBankSelectorModal({
-  quizId,
   existingIds,
   slotsLeft,
   onClose,
@@ -52,7 +51,6 @@ export default function QuestionBankSelectorModal({
   const [query, setQuery] = useState("");
   const [topicFilter, setTopicFilter] = useState<QuestionTopic | "all">("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   /* Load question bank */
@@ -66,6 +64,14 @@ export default function QuestionBankSelectorModal({
       setAll((data ?? []) as QuestionLite[]);
       setLoading(false);
     })();
+  }, []);
+
+  /* Lock body scroll while modal is open */
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, []);
 
   const existingSet = useMemo(() => new Set(existingIds), [existingIds]);
@@ -112,51 +118,30 @@ export default function QuestionBankSelectorModal({
     setSelected(new Set());
   }
 
-  async function add() {
+  function add() {
     if (selected.size === 0) return;
-    setError(null);
-    setSaving(true);
-
-    const startIndex = existingIds.length;
-    const rows = [...selected].map((qid, i) => ({
-      quiz_id: quizId,
-      question_id: qid,
-      order_index: startIndex + i,
-    }));
-
-    const { error: dbErr } = await supabase.from("quiz_questions").insert(rows);
-    setSaving(false);
-
-    if (dbErr) {
-      if (dbErr.code === "P0001" || dbErr.message.includes("limit exceeded")) {
-        setError("A quiz can hold a maximum of 20 questions.");
-      } else {
-        setError(dbErr.message);
-      }
-      return;
-    }
-
-    onAdded(selected.size);
+    const selectedObjs = all.filter((q) => selected.has(q.id));
+    onAdded(selectedObjs);
   }
 
   /* ---------- Render ---------- */
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 p-3 backdrop-blur-sm sm:p-4">
+    <div className="fixed inset-0 z-60 overflow-y-auto bg-slate-900/60 p-3 backdrop-blur-sm sm:p-4">
       <div className="mx-auto my-4 w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5 sm:my-8">
         {/* ============ Header ============ */}
         <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
           <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-linear-to-br from-sky-50 to-sky-100 text-sky-600">
               <Library className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-base font-bold text-slate-900 sm:text-lg">
+              <h2 className="text-base font-bold tracking-tight text-slate-900 sm:text-lg">
                 Add questions
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
                 Selected{" "}
-                <strong className="font-semibold text-slate-800">
+                <strong className="font-semibold text-sky-700">
                   {selected.size}
                 </strong>{" "}
                 of {slotsLeft}
@@ -165,7 +150,7 @@ export default function QuestionBankSelectorModal({
           </div>
           <button
             onClick={onClose}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 active:scale-95 sm:h-8 sm:w-8"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -177,7 +162,7 @@ export default function QuestionBankSelectorModal({
           <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
             <div
               className={`h-full transition-all duration-300 ${
-                !canSelectMore ? "bg-red-500" : "bg-sky-500"
+                !canSelectMore ? "bg-red-500" : "bg-linear-to-r from-sky-500 to-sky-400"
               }`}
               style={{
                 width: `${Math.min(
@@ -192,18 +177,18 @@ export default function QuestionBankSelectorModal({
         {/* ============ Filters ============ */}
         <div className="flex flex-col gap-2 border-b border-slate-100 px-4 py-3 sm:flex-row sm:px-5">
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
-              className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+              className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:py-2.5"
               placeholder="Search questions…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
           <div className="relative sm:w-48">
-            <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Filter className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <select
-              className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-8 text-sm text-slate-900 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+              className="w-full appearance-none rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-9 text-sm text-slate-900 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:py-2.5"
               value={topicFilter}
               onChange={(e) =>
                 setTopicFilter(e.target.value as QuestionTopic | "all")
@@ -216,12 +201,15 @@ export default function QuestionBankSelectorModal({
                 </option>
               ))}
             </select>
+            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+              ▾
+            </span>
           </div>
         </div>
 
         {/* ============ Quick actions ============ */}
         {!loading && filtered.length > 0 && (
-          <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/50 px-4 py-2 text-xs sm:px-5">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/50 px-4 py-2.5 text-xs sm:px-5">
             <span className="font-medium text-slate-500">
               {filtered.length} available
             </span>
@@ -229,14 +217,14 @@ export default function QuestionBankSelectorModal({
               <button
                 onClick={selectAllVisible}
                 disabled={!canSelectMore}
-                className="font-semibold text-sky-600 transition hover:text-sky-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+                className="font-semibold text-sky-600 transition hover:text-sky-700 hover:underline active:scale-95 disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
               >
                 Select all
               </button>
               {selected.size > 0 && (
                 <button
                   onClick={clearSelection}
-                  className="font-medium text-slate-500 transition hover:text-slate-700 hover:underline"
+                  className="font-medium text-slate-500 transition hover:text-slate-700 hover:underline active:scale-95"
                 >
                   Clear
                 </button>
@@ -246,10 +234,13 @@ export default function QuestionBankSelectorModal({
         )}
 
         {/* ============ List ============ */}
-        <div className="max-h-[50vh] overflow-y-auto px-4 py-3 sm:px-5">
+        <div className="max-h-[45vh] overflow-y-auto px-4 py-3 sm:max-h-[50vh] sm:px-5">
           {loading ? (
             <div className="grid place-items-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+              <div className="flex flex-col items-center gap-2 text-slate-500">
+                <Loader2 className="h-5 w-5 animate-spin text-sky-500" />
+                <span className="text-xs">Loading questions…</span>
+              </div>
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center">
@@ -263,7 +254,7 @@ export default function QuestionBankSelectorModal({
               </p>
             </div>
           ) : (
-            <ul className="space-y-1.5">
+            <ul className="space-y-2">
               {filtered.map((q) => {
                 const isSelected = selected.has(q.id);
                 const atCap = !canSelectMore && !isSelected;
@@ -273,26 +264,28 @@ export default function QuestionBankSelectorModal({
                       type="button"
                       onClick={() => !atCap && toggle(q.id)}
                       disabled={atCap}
-                      className={`group flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${
+                      className={`group flex w-full items-start gap-3 rounded-xl border p-4 text-left transition active:scale-[0.99] sm:p-3 ${
                         isSelected
-                          ? "border-sky-400 bg-sky-50 shadow-sm shadow-sky-500/5"
+                          ? "border-sky-400 bg-sky-50 shadow-sm shadow-sky-500/10"
                           : atCap
                             ? "cursor-not-allowed border-slate-200 opacity-50"
                             : "border-slate-200 hover:border-sky-200 hover:bg-slate-50"
                       }`}
                     >
                       <span
-                        className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition ${
+                        className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition sm:h-5 sm:w-5 ${
                           isSelected
                             ? "border-sky-500 bg-sky-500 text-white"
                             : "border-slate-300 bg-white group-hover:border-slate-400"
                         }`}
                       >
-                        {isSelected && <CheckCircle2 className="h-3.5 w-3.5" />}
+                        {isSelected && (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        )}
                       </span>
                       <div className="min-w-0 flex-1">
                         <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                             isSelected
                               ? "bg-sky-100 text-sky-700"
                               : "bg-slate-100 text-slate-600"
@@ -314,14 +307,17 @@ export default function QuestionBankSelectorModal({
 
         {/* ============ Error ============ */}
         {error && (
-          <div className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 sm:mx-5">
+          <div className="mx-4 mb-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700 sm:mx-5">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {/* ============ Footer ============ */}
-        <footer className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <footer
+          className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+          style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+        >
           <span className="text-xs">
             {canSelectMore ? (
               <span className="inline-flex items-center gap-1.5 text-slate-600">
@@ -341,24 +337,19 @@ export default function QuestionBankSelectorModal({
             )}
           </span>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <button
               onClick={onClose}
-              disabled={saving}
-              className="inline-flex flex-1 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+              className="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] sm:w-auto sm:py-2.5"
             >
               Cancel
             </button>
             <button
               onClick={add}
-              disabled={saving || selected.size === 0}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none sm:flex-none"
+              disabled={selected.size === 0}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-linear-to-b from-sky-500 to-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:from-sky-600 hover:to-sky-700 active:scale-[0.98] disabled:bg-slate-200 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:shadow-none sm:w-auto sm:py-2.5"
             >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
+              <Plus className="h-4 w-4" />
               {selected.size > 0
                 ? `Add ${selected.size}`
                 : "Add questions"}

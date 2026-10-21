@@ -12,6 +12,9 @@ import {
   AlertTriangle,
   Inbox,
   ClipboardList,
+  BookOpen,
+  Clock,
+  Calendar,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -75,7 +78,7 @@ export default function PerformancePage() {
         return;
       }
 
-      setRows((resRes.data ?? []) as any);
+      setRows((resRes.data ?? []) as unknown as ResultRow[]);
       setQuizzes((qzRes.data ?? []) as QuizOption[]);
       setLoading(false);
     })();
@@ -150,7 +153,7 @@ export default function PerformancePage() {
   /* ---------- Loading ---------- */
   if (loading) {
     return (
-      <div className="grid min-h-[60vh] place-items-center">
+      <div className="grid min-h-[60vh] place-items-center px-4">
         <div className="flex flex-col items-center gap-2 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
           <span className="text-sm">Loading results…</span>
@@ -177,7 +180,7 @@ export default function PerformancePage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
       {/* ============ Header ============ */}
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             Performance
@@ -196,7 +199,7 @@ export default function PerformancePage() {
         <button
           onClick={exportCSV}
           disabled={filtered.length === 0}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-300 disabled:hover:bg-white disabled:hover:text-slate-700"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-300 disabled:hover:bg-white disabled:hover:text-slate-700 sm:w-auto sm:py-2"
         >
           <Download className="h-4 w-4" />
           Export CSV
@@ -237,7 +240,7 @@ export default function PerformancePage() {
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
-            className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+            className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:py-2.5"
             placeholder="Search by student or school…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -248,7 +251,7 @@ export default function PerformancePage() {
         <div className="relative sm:w-64">
           <Filter className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <select
-            className="w-full appearance-none rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-900 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+            className="w-full appearance-none rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-9 text-sm text-slate-900 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:py-2.5"
             value={quizFilter}
             onChange={(e) => setQuizFilter(e.target.value)}
           >
@@ -265,62 +268,119 @@ export default function PerformancePage() {
         </div>
       </div>
 
-      {/* ============ Table ============ */}
+      {/* ============ Results (Table + Mobile Cards) ============ */}
       <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {filtered.length === 0 ? (
           <EmptyState hasRows={rows.length > 0} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-180 text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-5 py-3">Student</th>
-                  <th className="px-5 py-3">School</th>
-                  <th className="px-5 py-3">Quiz</th>
-                  <th className="px-5 py-3 text-right">Score</th>
-                  <th className="px-5 py-3 text-right">%</th>
-                  <th className="px-5 py-3 text-right">Time</th>
-                  <th className="px-5 py-3 text-right">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map((r) => {
-                  const pct =
-                    r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
-                  return (
-                    <tr key={r.id} className="transition hover:bg-slate-50/60">
-                      <td className="px-5 py-3.5 font-medium text-slate-800">
-                        {r.student?.full_name ?? "—"}
-                      </td>
-                      <td className="max-w-55 truncate px-5 py-3.5 text-slate-600">
-                        {r.student?.school ?? "—"}
-                      </td>
-                      <td className="max-w-55 truncate px-5 py-3.5 text-slate-600">
-                        {r.quiz?.title ?? "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-right tabular-nums text-slate-700">
+          <>
+            {/* ---- Desktop Table (Hidden on mobile) ---- */}
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3">Student</th>
+                    <th className="px-5 py-3">School</th>
+                    <th className="px-5 py-3">Quiz</th>
+                    <th className="px-5 py-3 text-right">Score</th>
+                    <th className="px-5 py-3 text-right">%</th>
+                    <th className="px-5 py-3 text-right">Time</th>
+                    <th className="px-5 py-3 text-right">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((r) => {
+                    const pct =
+                      r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
+                    return (
+                      <tr key={r.id} className="transition hover:bg-slate-50/60">
+                        <td className="px-5 py-3.5 font-medium text-slate-800">
+                          {r.student?.full_name ?? "—"}
+                        </td>
+                        <td className="max-w-[200px] truncate px-5 py-3.5 text-slate-600">
+                          {r.student?.school ?? "—"}
+                        </td>
+                        <td className="max-w-[200px] truncate px-5 py-3.5 text-slate-600">
+                          {r.quiz?.title ?? "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-right tabular-nums text-slate-700">
+                          {r.score} / {r.total}
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <PctBadge pct={pct} />
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-right tabular-nums text-slate-600">
+                          {fmtDuration(r.time_spent_seconds)}
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-right text-xs tabular-nums text-slate-500">
+                          {new Date(r.submitted_at).toLocaleString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ---- Mobile Stacked Cards (Hidden on desktop) ---- */}
+            <div className="divide-y divide-slate-100 sm:hidden">
+              {filtered.map((r) => {
+                const pct =
+                  r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
+                return (
+                  <div key={r.id} className="flex flex-col gap-3 p-4">
+                    {/* Header: Name & Percentage */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-slate-800">
+                          {r.student?.full_name ?? "Unknown Student"}
+                        </div>
+                        <div className="mt-0.5 truncate text-xs text-slate-500">
+                          {r.student?.school ?? "No school"}
+                        </div>
+                      </div>
+                      <PctBadge pct={pct} />
+                    </div>
+
+                    {/* Middle: Quiz & Score */}
+                    <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 p-2.5 text-xs text-slate-600">
+                      <div className="flex items-center gap-1.5 truncate font-medium">
+                        <BookOpen className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">
+                          {r.quiz?.title ?? "Deleted Quiz"}
+                        </span>
+                      </div>
+                      <div className="shrink-0 font-bold tabular-nums text-slate-700">
                         {r.score} / {r.total}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <PctBadge pct={pct} />
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-right tabular-nums text-slate-600">
+                      </div>
+                    </div>
+
+                    {/* Footer: Time & Date */}
+                    <div className="flex items-center justify-between text-[11px] font-medium text-slate-500">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-slate-400" />
                         {fmtDuration(r.time_spent_seconds)}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-right text-xs tabular-nums text-slate-500">
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-slate-400" />
                         {new Date(r.submitted_at).toLocaleString("en-GB", {
                           day: "2-digit",
                           month: "short",
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -350,7 +410,7 @@ function MiniStat({
   } as const;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+    <div className="flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md">
       <div className="flex items-center gap-2">
         <span className={`grid h-7 w-7 place-items-center rounded-lg ${tones[tone]}`}>
           {icon}
@@ -373,13 +433,13 @@ function MiniStat({
 function PctBadge({ pct }: { pct: number }) {
   const tone =
     pct >= 75
-      ? "bg-emerald-50 text-emerald-700"
+      ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
       : pct >= 50
-        ? "bg-amber-50 text-amber-700"
-        : "bg-red-50 text-red-700";
+        ? "bg-amber-50 text-amber-700 border border-amber-100"
+        : "bg-red-50 text-red-700 border border-red-100";
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${tone}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold tabular-nums shadow-sm ${tone}`}
     >
       {pct}%
     </span>

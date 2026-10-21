@@ -31,7 +31,7 @@ export default function SchoolAutocomplete({
   placeholder = "Start typing your school name…",
   required,
 }: Props) {
-  const [query, setQuery] = useState(value);
+  const query = value;
   const [results, setResults] = useState<School[]>([]);
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
@@ -39,17 +39,12 @@ export default function SchoolAutocomplete({
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /* Keep local input in sync if parent resets value */
-  useEffect(() => {
-    setQuery(value);
-  }, [value]);
-
   /* Debounced search */
   useEffect(() => {
     if (!open) return;
     if (query.trim().length < 2) {
-      setResults([]);
-      return;
+      const t = setTimeout(() => setResults([]), 200);
+      return () => clearTimeout(t);
     }
 
     const t = setTimeout(async () => {
@@ -80,7 +75,6 @@ export default function SchoolAutocomplete({
   }, []);
 
   function selectSchool(name: string) {
-    setQuery(name);
     onChange(name);
     setOpen(false);
     inputRef.current?.blur();
@@ -116,18 +110,17 @@ export default function SchoolAutocomplete({
     <div ref={wrapRef} className="relative">
       {/* ---------- Input ---------- */}
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           ref={inputRef}
           type="text"
-          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+          className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-9 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:py-2.5"
           value={query}
           required={required}
           placeholder={placeholder}
           autoComplete="off"
           onFocus={() => setOpen(true)}
           onChange={(e) => {
-            setQuery(e.target.value);
             onChange(e.target.value);
             setOpen(true);
           }}
@@ -140,18 +133,18 @@ export default function SchoolAutocomplete({
 
       {/* ---------- Dropdown ---------- */}
       {showDropdown && (
-        <div className="absolute left-0 right-0 z-30 mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5 ring-1 ring-slate-900/5">
+        <div className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/5">
           {/* Loading (only if no results yet) */}
           {loading && results.length === 0 && (
-            <div className="flex items-center gap-2 px-3 py-3 text-xs text-slate-500">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-500" />
+            <div className="flex items-center gap-2.5 px-4 py-4 text-sm text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin text-sky-500" />
               Searching schools…
             </div>
           )}
 
           {/* Result list */}
           {results.length > 0 && (
-            <ul className="max-h-64 overflow-auto py-1">
+            <ul className="max-h-56 overflow-y-auto py-1 sm:max-h-64">
               {results.map((s, i) => {
                 const active = i === highlight;
                 return (
@@ -161,19 +154,19 @@ export default function SchoolAutocomplete({
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => selectSchool(s.name)}
                       onMouseEnter={() => setHighlight(i)}
-                      className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition ${
+                      className={`flex w-full items-center justify-between gap-3 px-3.5 py-3 text-left transition active:bg-sky-100 sm:px-3 sm:py-2.5 ${
                         active ? "bg-sky-50" : "hover:bg-slate-50"
                       }`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
                         <span
-                          className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition ${
+                          className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition sm:h-7 sm:w-7 ${
                             active
-                              ? "bg-sky-100 text-sky-600"
+                              ? "bg-linear-to-br from-sky-100 to-sky-50 text-sky-600"
                               : "bg-slate-100 text-slate-500"
                           }`}
                         >
-                          <SchoolIcon className="h-3.5 w-3.5" />
+                          <SchoolIcon className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                         </span>
                         <span
                           className={`truncate text-sm ${
@@ -211,9 +204,9 @@ export default function SchoolAutocomplete({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => selectSchool(trimmed)}
-              className="flex w-full items-center gap-2 border-t border-slate-100 bg-slate-50/50 px-3 py-2.5 text-left text-sm font-medium text-sky-700 transition hover:bg-sky-50"
+              className="flex w-full items-center gap-2.5 border-t border-slate-100 bg-slate-50/50 px-3.5 py-3 text-left text-sm font-medium text-sky-700 transition hover:bg-sky-50 active:scale-[0.99] active:bg-sky-100 sm:px-3 sm:py-2.5"
             >
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-sky-100 text-sky-600">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-linear-to-br from-sky-500 to-sky-600 text-white shadow-sm shadow-sky-500/25">
                 <Plus className="h-3.5 w-3.5" />
               </span>
               <span className="min-w-0 truncate">
@@ -224,7 +217,7 @@ export default function SchoolAutocomplete({
 
           {/* Empty state */}
           {!loading && results.length === 0 && !showAddRow && (
-            <div className="px-3 py-4 text-center text-xs text-slate-500">
+            <div className="px-3 py-5 text-center text-xs text-slate-500">
               No schools match &ldquo;{trimmed}&rdquo;
             </div>
           )}

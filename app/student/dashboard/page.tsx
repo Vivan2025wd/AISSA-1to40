@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Loader2,
@@ -14,14 +14,14 @@ import {
   CheckCircle2,
   PlayCircle,
   BookOpen,
-  Sparkles,
+  RefreshCw,
   AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { formatCountdown, getQuizWindow } from "@/lib/quiz-window";
 
 /* ------------------------------------------------------------------ */
-/*  Types (mirror the RPC response — unchanged)                       */
+/*  Types                                                             */
 /* ------------------------------------------------------------------ */
 
 interface DashboardData {
@@ -61,21 +61,31 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { data: res, error: rpcErr } = await supabase.rpc("get_dashboard_data");
-      if (rpcErr) {
-        setError(rpcErr.message);
-        setLoading(false);
-        return;
-      }
-      setData(res as DashboardData);
+  const load = useCallback(async () => {
+    const { data: res, error: rpcErr } = await supabase.rpc(
+      "get_dashboard_data"
+    );
+    if (rpcErr) {
+      setError(rpcErr.message);
       setLoading(false);
-    })();
+      return;
+    }
+    setData(res as DashboardData);
+    setLoading(false);
   }, []);
 
+  useEffect(() => {
+    void Promise.resolve().then(load);
+  }, [load]);
+
+  const retry = useCallback(() => {
+    setError(null);
+    setLoading(true);
+    void load();
+  }, [load]);
+
   if (loading) return <CenterSpinner label="Loading dashboard…" />;
-  if (error) return <CenterError message={error} />;
+  if (error) return <CenterError message={error} onRetry={retry} />;
   if (!data) return null;
 
   const firstName = data.profile.full_name.split(" ")[0] || "there";
@@ -88,8 +98,10 @@ export default function DashboardPage() {
           Hi, {firstName} 👋
         </h1>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
-          <BookOpen className="h-3.5 w-3.5" />
-          {data.profile.school || "Sri Lanka"}
+          <BookOpen className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">
+            {data.profile.school || "Sri Lanka"}
+          </span>
         </p>
       </header>
 
@@ -167,7 +179,7 @@ export default function DashboardPage() {
           />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            {/* Desktop table */}
+            {/* ---- Desktop table ---- */}
             <div className="hidden sm:block">
               <table className="w-full text-sm">
                 <thead className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -217,7 +229,7 @@ export default function DashboardPage() {
               </table>
             </div>
 
-            {/* Mobile cards */}
+            {/* ---- Mobile cards ---- */}
             <div className="divide-y divide-slate-100 sm:hidden">
               {data.past_results.map((r) => {
                 const pct =
@@ -226,15 +238,15 @@ export default function DashboardPage() {
                   <Link
                     key={r.id}
                     href={`/student/quiz/${r.quiz_id}`}
-                    className="block px-4 py-3.5 transition active:bg-slate-50"
+                    className="block px-4 py-4 transition active:bg-slate-100"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <span className="line-clamp-1 flex-1 font-medium text-slate-800">
                         {r.title}
                       </span>
-                      <PctBadge pct={pct} />
+                      <PctBadge pct={pct} size="md" />
                     </div>
-                    <div className="mt-1.5 flex items-center gap-2 text-xs tabular-nums text-slate-500">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs tabular-nums text-slate-500">
                       <span>
                         {r.score}/{r.total}
                       </span>
@@ -255,7 +267,7 @@ export default function DashboardPage() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Sub-components                                                    */
+/*  StatCard                                                          */
 /* ------------------------------------------------------------------ */
 
 function StatCard({
@@ -278,7 +290,9 @@ function StatCard({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md">
-      <div className={`grid h-9 w-9 place-items-center rounded-xl ${accents[accent]}`}>
+      <div
+        className={`grid h-9 w-9 place-items-center rounded-xl ${accents[accent]}`}
+      >
         {icon}
       </div>
       <div className="mt-3 text-2xl font-bold tabular-nums tracking-tight text-slate-900">
@@ -290,6 +304,10 @@ function StatCard({
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  QuizCard                                                          */
+/* ------------------------------------------------------------------ */
 
 function QuizCard({
   quiz,
@@ -314,20 +332,20 @@ function QuizCard({
   const attemptable = w.status === "active" && !quiz.attempted;
 
   const statusBadge = quiz.attempted ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
       <CheckCircle2 className="h-3 w-3" /> Done
     </span>
   ) : w.status === "active" ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500" />
       Live
     </span>
   ) : w.status === "upcoming" ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
       <Clock className="h-3 w-3" /> Soon
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
       Closed
     </span>
   );
@@ -383,12 +401,12 @@ function QuizCard({
         </div>
       )}
 
-      {/* Action */}
+      {/* Action — extra tall on mobile */}
       <div className="mt-4">
         {attemptable ? (
           <Link
             href={`/student/quiz/${quiz.id}`}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:py-2.5"
           >
             <PlayCircle className="h-4 w-4" />
             Start quiz
@@ -396,7 +414,7 @@ function QuizCard({
         ) : quiz.attempted ? (
           <Link
             href={`/student/quiz/${quiz.id}`}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] sm:py-2.5"
           >
             Review answers
             <ChevronRight className="h-4 w-4" />
@@ -404,7 +422,7 @@ function QuizCard({
         ) : (
           <button
             disabled
-            className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-400"
+            className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-400 sm:py-2.5"
           >
             Not available
           </button>
@@ -414,21 +432,41 @@ function QuizCard({
   );
 }
 
-function PctBadge({ pct }: { pct: number }) {
+/* ------------------------------------------------------------------ */
+/*  PctBadge                                                          */
+/* ------------------------------------------------------------------ */
+
+function PctBadge({
+  pct,
+  size = "sm",
+}: {
+  pct: number;
+  size?: "sm" | "md";
+}) {
   const tone =
     pct >= 75
       ? "bg-emerald-50 text-emerald-700"
       : pct >= 50
         ? "bg-amber-50 text-amber-700"
         : "bg-red-50 text-red-700";
+
+  const sizeClass =
+    size === "md"
+      ? "px-2.5 py-1 text-sm"
+      : "px-2 py-0.5 text-xs";
+
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${tone}`}
+      className={`inline-flex shrink-0 items-center rounded-full font-bold tabular-nums ${tone} ${sizeClass}`}
     >
       {pct}%
     </span>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  EmptyState                                                        */
+/* ------------------------------------------------------------------ */
 
 function EmptyState({
   icon,
@@ -450,9 +488,13 @@ function EmptyState({
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Loading / Error                                                   */
+/* ------------------------------------------------------------------ */
+
 function CenterSpinner({ label }: { label: string }) {
   return (
-    <div className="grid min-h-[60vh] place-items-center">
+    <div className="grid min-h-dvh place-items-center px-4">
       <div className="flex flex-col items-center gap-2 text-slate-500">
         <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
         <span className="text-sm">{label}</span>
@@ -461,18 +503,30 @@ function CenterSpinner({ label }: { label: string }) {
   );
 }
 
-function CenterError({ message }: { message: string }) {
+function CenterError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
   return (
-    <div className="mx-auto max-w-md px-4 py-16 text-center">
-      <div className="grid place-items-center">
-        <div className="grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-600">
+    <div className="grid min-h-dvh place-items-center px-4">
+      <div className="mx-auto max-w-md text-center">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-600">
           <AlertTriangle className="h-6 w-6" />
         </div>
+        <h2 className="mt-4 text-lg font-semibold text-slate-900">
+          Failed to load dashboard
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">{message}</p>
+        <button
+          onClick={onRetry}
+          className="mt-6 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] sm:py-2.5"
+        >
+          <RefreshCw className="h-4 w-4" /> Try again
+        </button>
       </div>
-      <h2 className="mt-4 text-lg font-semibold text-slate-900">
-        Failed to load dashboard
-      </h2>
-      <p className="mt-1 text-sm text-slate-600">{message}</p>
     </div>
   );
 }

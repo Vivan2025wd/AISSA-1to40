@@ -86,20 +86,33 @@ export default function QuestionsPage() {
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<QuestionRow | null>(null);
 
-  async function load() {
-    setLoading(true);
-    setError(null);
-    const { data, error: dbErr } = await supabase
+  function fetchQuestions() {
+    return supabase
       .from("questions")
       .select("*")
       .order("created_at", { ascending: false });
+  }
+
+  async function load() {
+    const { data, error: dbErr } = await fetchQuestions();
+    setError(null);
     if (dbErr) setError(dbErr.message);
     setRows((data ?? []) as QuestionRow[]);
     setLoading(false);
   }
 
   useEffect(() => {
-    load();
+    let active = true;
+    fetchQuestions().then(({ data, error: dbErr }) => {
+      if (!active) return;
+      setError(dbErr?.message ?? null);
+      setRows((data ?? []) as QuestionRow[]);
+      setLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -129,7 +142,7 @@ export default function QuestionsPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
       {/* ============ Header ============ */}
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div className="flex items-start gap-3">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-50 text-sky-600">
             <Library className="h-6 w-6" />
@@ -146,7 +159,7 @@ export default function QuestionsPage() {
 
         <button
           onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:w-auto sm:py-2.5"
         >
           <Plus className="h-4 w-4" /> New question
         </button>
@@ -157,7 +170,7 @@ export default function QuestionsPage() {
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
-            className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+            className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:py-2.5"
             placeholder="Search questions…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -167,7 +180,7 @@ export default function QuestionsPage() {
         <div className="relative sm:w-52">
           <Filter className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <select
-            className="w-full appearance-none rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-900 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+            className="w-full appearance-none rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-9 text-sm text-slate-900 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:py-2.5"
             value={topicFilter}
             onChange={(e) => setTopicFilter(e.target.value as Topic | "all")}
           >
@@ -246,18 +259,18 @@ export default function QuestionsPage() {
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
             This removes the question from the bank and detaches it from every
-            quiz. This can't be undone.
+            quiz. This can&apos;t be undone.
           </p>
-          <div className="mt-5 flex gap-2">
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
             <button
               onClick={() => setDeleting(null)}
-              className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
+              className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] sm:py-2.5"
             >
               Cancel
             </button>
             <button
               onClick={handleDelete}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-500/25 transition hover:bg-red-700 active:scale-[0.98]"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-red-500/25 transition hover:bg-red-700 active:scale-[0.98] sm:py-2.5"
             >
               <Trash2 className="h-4 w-4" /> Delete
             </button>
@@ -332,7 +345,7 @@ function QuestionCard({
         <div className="flex shrink-0 gap-1">
           <button
             onClick={onEdit}
-            className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-sky-50 hover:text-sky-600 active:scale-95"
+            className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 transition hover:bg-sky-50 hover:text-sky-600 active:scale-95 sm:h-9 sm:w-9"
             title="Edit"
             aria-label="Edit question"
           >
@@ -340,7 +353,7 @@ function QuestionCard({
           </button>
           <button
             onClick={onDelete}
-            className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 active:scale-95"
+            className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 active:scale-95 sm:h-9 sm:w-9"
             title="Delete"
             aria-label="Delete question"
           >
@@ -367,11 +380,16 @@ function QuestionModal({
 }) {
   const isEdit = "id" in initial;
   const [draft, setDraft] = useState<Draft>(() => {
-    const { id: _id, created_at: _c, ...rest } = initial as any;
-    return rest as Draft;
+    if ("id" in initial) {
+      const { id: _id, created_at: _c, ...rest } = initial;
+      void _id;
+      void _c;
+      return rest;
+    }
+    return initial;
   });
   const [optionCount, setOptionCount] = useState<4 | 5>(
-    (initial as any).option_5_si ? 5 : 4
+    initial.option_5_si ? 5 : 4
   );
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -426,7 +444,7 @@ function QuestionModal({
       return setError("Please mark the correct option.");
 
     // Blank out option 5 if 4-option mode
-    const payload: any = { ...draft };
+    const payload: Draft = { ...draft };
     if (optionCount === 4) {
       payload.option_5_si = null;
       payload.option_5_en = null;
@@ -434,11 +452,33 @@ function QuestionModal({
     }
 
     // Convert "" to null for optional EN fields
-    for (const k of Object.keys(payload)) {
+    const optionalFields: (
+      | "question_text_en"
+      | "option_5_si"
+      | "option_1_en"
+      | "option_2_en"
+      | "option_3_en"
+      | "option_4_en"
+      | "option_5_en"
+      | "explanation_si"
+      | "explanation_en"
+      | "image_url"
+    )[] = [
+      "question_text_en",
+      "option_5_si",
+      "option_1_en",
+      "option_2_en",
+      "option_3_en",
+      "option_4_en",
+      "option_5_en",
+      "explanation_si",
+      "explanation_en",
+      "image_url",
+    ];
+    for (const k of optionalFields) {
       if (
         typeof payload[k] === "string" &&
-        payload[k].trim() === "" &&
-        k !== "question_text_si"
+        payload[k].trim() === ""
       ) {
         payload[k] = null;
       }
@@ -546,7 +586,12 @@ function QuestionModal({
               <div className="grid gap-2 sm:grid-cols-2">
                 {[1, 2, 3, 4, 5].map((n) => {
                   if (n === 5 && optionCount === 4) return null;
-                  const key = `option_${n}_si` as keyof Draft;
+                  const key = `option_${n}_si` as
+                    | "option_1_si"
+                    | "option_2_si"
+                    | "option_3_si"
+                    | "option_4_si"
+                    | "option_5_si";
                   const isCorrect = draft.correct_option === n;
                   return (
                     <div
@@ -578,7 +623,7 @@ function QuestionModal({
                         className="w-full rounded-md border-0 bg-transparent px-2 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
                         placeholder={`Option ${n}`}
                         value={(draft[key] as string) ?? ""}
-                        onChange={(e) => set(key, e.target.value as any)}
+                        onChange={(e) => set(key, e.target.value)}
                       />
                     </div>
                   );
@@ -661,7 +706,7 @@ function QuestionModal({
                         className="w-full rounded-md border-0 bg-transparent px-2 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
                         placeholder={`Option ${n}`}
                         value={(draft[key] as string) ?? ""}
-                        onChange={(e) => set(key, e.target.value as any)}
+                        onChange={(e) => set(key, e.target.value)}
                       />
                     </div>
                   );
@@ -858,7 +903,7 @@ function EmptyState({
       {!hasRows && (
         <button
           onClick={onCreate}
-          className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+          className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:py-2.5"
         >
           <Plus className="h-4 w-4" /> Add first question
         </button>

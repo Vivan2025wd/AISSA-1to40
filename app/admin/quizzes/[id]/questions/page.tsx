@@ -14,24 +14,18 @@ import {
   Library,
   AlertTriangle,
   ListOrdered,
-  GripVertical,
   CheckCircle2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import QuestionBankSelectorModal from "@/components/QuestionBankSelectorModal";
+import QuestionBankSelectorModal, {
+  type QuestionLite,
+} from "@/components/QuestionBankSelectorModal";
 
 const MAX_QUESTIONS = 20;
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
 /* ------------------------------------------------------------------ */
-
-interface QuestionLite {
-  id: string;
-  topic: string;
-  question_text_si: string;
-  question_text_en: string | null;
-}
 
 interface LinkedQuestion extends QuestionLite {
   link_id: string;
@@ -73,12 +67,10 @@ export default function QuizQuestionsPage() {
           .maybeSingle(),
         supabase
           .from("quiz_questions")
-          .select(
-            `
+          .select(`
             id, order_index,
             question:questions (id, topic, question_text_si, question_text_en)
-          `
-          )
+          `)
           .eq("quiz_id", quizId)
           .order("order_index", { ascending: true }),
       ]);
@@ -92,18 +84,25 @@ export default function QuizQuestionsPage() {
     setQuiz((q as QuizMeta | null) ?? null);
     setLinked(
       (links ?? [])
-        .filter((l: any) => l.question)
-        .map((l: any) => ({
-          link_id: l.id,
-          order_index: l.order_index,
-          ...(l.question as QuestionLite),
-        }))
+        .flatMap((l) => {
+          const question = l.question?.[0];
+          return question
+            ? [{
+                link_id: l.id,
+                order_index: l.order_index,
+                ...question,
+              }]
+            : [];
+        })
     );
     setLoading(false);
   }
 
   useEffect(() => {
-    load();
+    const timeout = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizId]);
 
@@ -114,6 +113,34 @@ export default function QuizQuestionsPage() {
     const t = setTimeout(() => setToast(null), 2500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  /* ---------- Add questions ---------- */
+
+  async function handleAddQuestions(newQuestions: QuestionLite[]) {
+    setPickerOpen(false);
+    if (newQuestions.length === 0) return;
+
+    const startIndex = linked.length;
+    const rows = newQuestions.map((q, i) => ({
+      quiz_id: quizId,
+      question_id: q.id,
+      order_index: startIndex + i,
+    }));
+
+    const { error: dbErr } = await supabase.from("quiz_questions").insert(rows);
+
+    if (dbErr) {
+      if (dbErr.code === "P0001" || dbErr.message.includes("limit exceeded")) {
+        setToast("Error: Cannot exceed 20 questions.");
+      } else {
+        setToast(`Error: ${dbErr.message}`);
+      }
+      return;
+    }
+
+    setToast(`${newQuestions.length} question${newQuestions.length !== 1 ? "s" : ""} added`);
+    load();
+  }
 
   /* ---------- Reorder ---------- */
 
@@ -169,7 +196,7 @@ export default function QuizQuestionsPage() {
 
   if (loading) {
     return (
-      <div className="grid min-h-[60vh] place-items-center">
+      <div className="grid min-h-[60vh] place-items-center px-4">
         <div className="flex flex-col items-center gap-2 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
           <span className="text-sm">Loading quiz…</span>
@@ -192,7 +219,7 @@ export default function QuizQuestionsPage() {
         <p className="mt-1 text-sm text-slate-600">{error}</p>
         <Link
           href="/admin/quizzes"
-          className="mt-6 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          className="mt-6 inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:py-2.5"
         >
           <ArrowLeft className="h-4 w-4" /> Back to quizzes
         </Link>
@@ -209,13 +236,13 @@ export default function QuizQuestionsPage() {
       {/* ============ Back link ============ */}
       <Link
         href="/admin/quizzes"
-        className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-slate-800"
+        className="inline-flex items-center gap-1 py-1 text-xs font-medium text-slate-500 transition hover:text-slate-800"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Back to quizzes
       </Link>
 
       {/* ============ Header ============ */}
-      <header className="mt-2 flex flex-wrap items-start justify-between gap-3">
+      <header className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div className="flex items-start gap-3">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-50 text-sky-600">
             <ListOrdered className="h-6 w-6" />
@@ -233,7 +260,7 @@ export default function QuizQuestionsPage() {
         <button
           onClick={() => setPickerOpen(true)}
           disabled={capReached}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none sm:w-auto sm:py-2.5"
         >
           <Plus className="h-4 w-4" /> Add questions
         </button>
@@ -285,7 +312,6 @@ export default function QuizQuestionsPage() {
                     : "hover:border-sky-200 hover:shadow-md hover:shadow-sky-100/60"
                 }`}
               >
-                {/* Position number */}
                 <span
                   className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-xs font-bold tabular-nums transition ${
                     i === 0
@@ -296,7 +322,6 @@ export default function QuizQuestionsPage() {
                   {i + 1}
                 </span>
 
-                {/* Content */}
                 <div className="min-w-0 flex-1">
                   <div className="mb-1.5 flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
@@ -308,34 +333,28 @@ export default function QuizQuestionsPage() {
                   </p>
                 </div>
 
-                {/* Actions */}
                 <div className="flex shrink-0 flex-col gap-1 sm:flex-row sm:items-center">
                   <button
                     onClick={() => move(i, -1)}
                     disabled={i === 0 || busyId === q.link_id}
-                    className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                    className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent sm:h-9 sm:w-9"
                     title="Move up"
-                    aria-label={`Move question ${i + 1} up`}
                   >
                     <ArrowUp className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => move(i, 1)}
-                    disabled={
-                      i === linked.length - 1 || busyId === q.link_id
-                    }
-                    className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                    disabled={i === linked.length - 1 || busyId === q.link_id}
+                    className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent sm:h-9 sm:w-9"
                     title="Move down"
-                    aria-label={`Move question ${i + 1} down`}
                   >
                     <ArrowDown className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setRemoving(q)}
                     disabled={busyId === q.link_id}
-                    className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                    className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 sm:h-9 sm:w-9"
                     title="Remove"
-                    aria-label={`Remove question ${i + 1}`}
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -349,17 +368,10 @@ export default function QuizQuestionsPage() {
       {/* ============ Add questions modal ============ */}
       {pickerOpen && (
         <QuestionBankSelectorModal
-          quizId={quizId}
           existingIds={linked.map((l) => l.id)}
           slotsLeft={slotsLeft}
           onClose={() => setPickerOpen(false)}
-          onAdded={(count) => {
-            setPickerOpen(false);
-            setToast(
-              `${count} question${count !== 1 ? "s" : ""} added`
-            );
-            load();
-          }}
+          onAdded={handleAddQuestions}
         />
       )}
 
@@ -381,24 +393,21 @@ export default function QuizQuestionsPage() {
                 Remove this question?
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                The question will be unlinked from this quiz. It stays in the
-                bank and can be added again anytime.
+                The question will be unlinked from this quiz. It stays in the bank.
               </p>
-
               <p className="mt-3 line-clamp-2 rounded-lg bg-slate-50 px-3 py-2 text-left text-xs text-slate-700">
                 {removing.question_text_si}
               </p>
-
-              <div className="mt-5 flex gap-2">
+              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
                 <button
                   onClick={() => setRemoving(null)}
-                  className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
+                  className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] sm:py-2.5"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={remove}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-500/25 transition hover:bg-red-700 active:scale-[0.98]"
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-red-500/25 transition hover:bg-red-700 active:scale-[0.98] sm:py-2.5"
                 >
                   <Trash2 className="h-4 w-4" /> Remove
                 </button>
@@ -438,7 +447,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       </p>
       <button
         onClick={onAdd}
-        className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+        className="mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:w-auto sm:py-2.5"
       >
         <Plus className="h-4 w-4" /> Add questions
       </button>

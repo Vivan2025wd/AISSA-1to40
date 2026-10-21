@@ -13,20 +13,25 @@ import {
   GraduationCap,
   ShieldCheck,
   Zap,
-  Menu,
 } from "lucide-react";
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-white text-slate-800 antialiased">
+    <main className="min-h-dvh overflow-x-hidden bg-white text-slate-800 antialiased">
       {/* ============================================================ */}
       {/*  Header                                                      */}
       {/* ============================================================ */}
-      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-md">
+      <header
+        className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-sky-500 text-white shadow-sm shadow-sky-500/30">
-              <FlaskConical className="h-4.5 w-4.5" />
+          <Link
+            href="/"
+            className="group flex items-center gap-2.5 transition active:scale-[0.98]"
+          >
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-linear-to-br from-sky-500 to-sky-600 text-white shadow-sm shadow-sky-500/30 ring-1 ring-sky-500/20 transition group-hover:shadow-md group-hover:shadow-sky-500/40">
+              <FlaskConical className="h-5 w-5" />
             </div>
             <div className="leading-tight">
               <div className="text-[15px] font-bold tracking-tight text-slate-900">
@@ -41,13 +46,13 @@ export default function LandingPage() {
           <nav className="flex items-center gap-1.5 sm:gap-2">
             <Link
               href="/auth/login"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 sm:px-4"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 active:scale-[0.98] sm:px-4"
             >
               Sign in
             </Link>
             <Link
               href="/auth/register"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-sky-500/30 transition hover:bg-sky-600 sm:px-4"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-linear-to-b from-sky-500 to-sky-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-sky-500/30 transition hover:from-sky-600 hover:to-sky-700 active:scale-[0.98] sm:px-4"
             >
               Get started
               <ArrowRight className="h-3.5 w-3.5" />
@@ -71,14 +76,14 @@ export default function LandingPage() {
           <div className="absolute -left-24 top-72 h-72 w-72 rounded-full bg-sky-100/60 blur-3xl" />
         </div>
 
-        <div className="mx-auto max-w-6xl px-4 pb-16 pt-14 sm:px-6 sm:pb-24 sm:pt-20">
+        <div className="mx-auto max-w-6xl px-4 pb-16 pt-12 sm:px-6 sm:pb-24 sm:pt-20">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50/80 px-3 py-1 text-[11px] font-semibold text-sky-700 sm:text-xs">
               <Sparkles className="h-3.5 w-3.5" />
               Free for Sri Lankan O/L students
             </span>
 
-            <h1 className="mt-6 text-[34px] font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
+            <h1 className="mt-6 text-[32px] font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
               Master O/L Science with{" "}
               <span className="bg-linear-to-r from-sky-500 to-sky-700 bg-clip-text text-transparent">
                 competitive quizzes
@@ -93,7 +98,7 @@ export default function LandingPage() {
             <div className="mt-8 flex flex-col items-stretch gap-3 sm:mt-10 sm:flex-row sm:items-center sm:justify-center">
               <Link
                 href="/auth/register"
-                className="group inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-sky-500/25 transition hover:bg-sky-600 hover:shadow-xl hover:shadow-sky-500/30 active:scale-[0.98] sm:py-3"
+                className="group inline-flex items-center justify-center gap-2 rounded-xl bg-linear-to-b from-sky-500 to-sky-600 px-6 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-sky-500/25 transition hover:from-sky-600 hover:to-sky-700 hover:shadow-xl hover:shadow-sky-500/30 active:scale-[0.98] sm:py-3"
               >
                 Start learning free
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
@@ -124,7 +129,7 @@ export default function LandingPage() {
           </div>
 
           {/* Mock exam preview */}
-          <div className="mx-auto mt-14 max-w-4xl sm:mt-20">
+          <div className="mx-auto mt-12 max-w-4xl sm:mt-20">
             <ExamPreview />
           </div>
         </div>
@@ -145,7 +150,7 @@ export default function LandingPage() {
       {/* ============================================================ */}
       {/*  Features                                                    */}
       {/* ============================================================ */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-24">
         <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-14">
           <h2 className="text-[26px] font-bold tracking-tight text-slate-900 sm:text-4xl">
             Everything you need to prepare
@@ -194,7 +199,7 @@ export default function LandingPage() {
       {/*  How it works                                                */}
       {/* ============================================================ */}
       <section className="border-y border-slate-200 bg-slate-50/70">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-24">
           <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-14">
             <h2 className="text-[26px] font-bold tracking-tight text-slate-900 sm:text-4xl">
               How it works
@@ -230,7 +235,7 @@ export default function LandingPage() {
       {/* ============================================================ */}
       {/*  Bottom CTA                                                  */}
       {/* ============================================================ */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-24">
         <div className="relative overflow-hidden rounded-2xl border border-sky-100 bg-linear-to-br from-sky-50 via-white to-slate-50 p-8 text-center shadow-sm sm:rounded-3xl sm:p-14">
           <div
             aria-hidden
@@ -242,7 +247,7 @@ export default function LandingPage() {
           />
 
           <div className="relative">
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-sky-500 text-white shadow-md shadow-sky-500/30">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-linear-to-br from-sky-500 to-sky-600 text-white shadow-md shadow-sky-500/30 ring-1 ring-sky-500/20">
               <FlaskConical className="h-6 w-6" />
             </div>
             <h2 className="mt-5 text-[26px] font-bold tracking-tight text-slate-900 sm:text-4xl">
@@ -255,7 +260,7 @@ export default function LandingPage() {
             <div className="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center">
               <Link
                 href="/auth/register"
-                className="group inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:py-3"
+                className="group inline-flex items-center justify-center gap-2 rounded-xl bg-linear-to-b from-sky-500 to-sky-600 px-6 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-sky-500/25 transition hover:from-sky-600 hover:to-sky-700 active:scale-[0.98] sm:py-3"
               >
                 Create free account
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
@@ -274,10 +279,13 @@ export default function LandingPage() {
       {/* ============================================================ */}
       {/*  Footer                                                      */}
       {/* ============================================================ */}
-      <footer className="border-t border-slate-200 bg-white">
+      <footer
+        className="border-t border-slate-200 bg-white"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-8 text-center sm:flex-row sm:justify-between sm:px-6 sm:text-left">
           <div className="flex items-center gap-2 text-sm text-slate-500">
-            <div className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500 text-white">
+            <div className="grid h-7 w-7 place-items-center rounded-lg bg-linear-to-br from-sky-500 to-sky-600 text-white">
               <FlaskConical className="h-3.5 w-3.5" />
             </div>
             <span>O/L Science Quiz · Built for Sri Lankan students</span>
@@ -328,7 +336,7 @@ function Feature({
   desc: string;
 }) {
   return (
-    <div className="group relative rounded-2xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-lg hover:shadow-sky-100/60 sm:p-6">
+    <div className="group relative rounded-2xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-lg hover:shadow-sky-100/60 active:scale-[0.99] sm:p-6">
       <div className="grid h-10 w-10 place-items-center rounded-xl bg-sky-50 text-sky-600 transition group-hover:bg-sky-500 group-hover:text-white">
         {icon}
       </div>
@@ -352,7 +360,7 @@ function Step({
   return (
     <li className="relative rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
       <div className="flex items-center gap-3">
-        <div className="grid h-9 w-9 place-items-center rounded-full bg-sky-500 text-sm font-bold text-white shadow-sm shadow-sky-500/30">
+        <div className="grid h-9 w-9 place-items-center rounded-full bg-linear-to-br from-sky-500 to-sky-600 text-sm font-bold text-white shadow-sm shadow-sky-500/30">
           {n}
         </div>
         <div className="text-slate-400">{icon}</div>

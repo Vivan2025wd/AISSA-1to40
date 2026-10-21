@@ -13,6 +13,7 @@ import {
   ChevronRight,
   AlertTriangle,
   Inbox,
+  Calendar,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getQuizWindow } from "@/lib/quiz-window";
@@ -114,7 +115,7 @@ export default function AdminDashboard() {
 
       const topicMap = new Map<string, number>();
       for (const row of topicsRes.data ?? []) {
-        const t = (row as any).topic ?? "General";
+        const t = row.topic ?? "General";
         topicMap.set(t, (topicMap.get(t) ?? 0) + 1);
       }
       const topics = [...topicMap.entries()]
@@ -127,9 +128,15 @@ export default function AdminDashboard() {
         quizzes: qzCount.count ?? 0,
         published: pubCount.count ?? 0,
         results: rCount.count ?? 0,
-        recent: (recentRes.data ?? []) as any,
+        recent: (recentRes.data ?? []).map((row) => ({
+          ...row,
+          profile: Array.isArray(row.profile)
+            ? row.profile[0] ?? null
+            : row.profile,
+          quiz: Array.isArray(row.quiz) ? row.quiz[0] ?? null : row.quiz,
+        })) as Snapshot["recent"],
         topics,
-        upcoming: (upcomingRes.data ?? []) as any,
+        upcoming: (upcomingRes.data ?? []) as Snapshot["upcoming"],
       });
       setLoading(false);
     })();
@@ -138,7 +145,7 @@ export default function AdminDashboard() {
   /* ---------- Loading ---------- */
   if (loading) {
     return (
-      <div className="grid min-h-[60vh] place-items-center">
+      <div className="grid min-h-[60vh] place-items-center px-4">
         <div className="flex flex-col items-center gap-2 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
           <span className="text-sm">Loading overview…</span>
@@ -202,19 +209,22 @@ export default function AdminDashboard() {
           value={data.published}
           tone="violet"
         />
-        <Stat
-          icon={<TrendingUp className="h-5 w-5" />}
-          label="Submissions"
-          value={data.results}
-          tone="rose"
-        />
+        {/* On mobile, this card spans full width to prevent lonely gap */}
+        <div className="col-span-2 sm:col-span-1">
+          <Stat
+            icon={<TrendingUp className="h-5 w-5" />}
+            label="Submissions"
+            value={data.results}
+            tone="rose"
+          />
+        </div>
       </div>
 
       {/* ============ Two-column: topics + upcoming ============ */}
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         {/* ---- Topics ---- */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:col-span-1">
-          <div className="border-b border-slate-100 px-5 py-4">
+          <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
             <h2 className="text-sm font-bold tracking-tight text-slate-900">
               Topics
             </h2>
@@ -223,7 +233,7 @@ export default function AdminDashboard() {
             </p>
           </div>
 
-          <div className="p-5">
+          <div className="p-4 sm:p-5">
             {data.topics.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-6 text-center">
                 <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-400">
@@ -264,7 +274,7 @@ export default function AdminDashboard() {
 
         {/* ---- Upcoming quizzes ---- */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:col-span-2">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
             <div>
               <h2 className="text-sm font-bold tracking-tight text-slate-900">
                 Upcoming quizzes
@@ -298,14 +308,14 @@ export default function AdminDashboard() {
                   <li key={q.id}>
                     <Link
                       href={`/admin/quizzes/${q.id}/questions`}
-                      className="group flex items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-slate-50/70"
+                      className="group flex flex-col gap-2 px-4 py-3.5 transition hover:bg-slate-50/70 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-slate-800">
                           {q.title}
                         </div>
                         <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                          <Clock className="h-3 w-3" />
+                          <Clock className="h-3 w-3 shrink-0" />
                           <span className="tabular-nums">
                             {new Date(q.scheduled_at).toLocaleString("en-GB", {
                               day: "2-digit",
@@ -319,7 +329,7 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
                         <QuizStatusBadge
                           isPublished={q.is_published}
                           status={w.status}
@@ -337,7 +347,7 @@ export default function AdminDashboard() {
 
       {/* ============ Recent submissions ============ */}
       <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
           <div>
             <h2 className="text-sm font-bold tracking-tight text-slate-900">
               Recent submissions
@@ -367,50 +377,93 @@ export default function AdminDashboard() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-140 text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-5 py-3">Student</th>
-                  <th className="px-5 py-3">School</th>
-                  <th className="px-5 py-3">Quiz</th>
-                  <th className="px-5 py-3 text-right">Score</th>
-                  <th className="px-5 py-3 text-right">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.recent.map((r) => {
-                  const pct =
-                    r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
-                  return (
-                    <tr
-                      key={r.id}
-                      className="transition hover:bg-slate-50/60"
-                    >
-                      <td className="px-5 py-3.5 font-medium text-slate-800">
-                        {r.profile?.full_name ?? "—"}
-                      </td>
-                      <td className="max-w-55 truncate px-5 py-3.5 text-slate-600">
-                        {r.profile?.school ?? "—"}
-                      </td>
-                      <td className="max-w-55 truncate px-5 py-3.5 text-slate-600">
-                        {r.quiz?.title ?? "—"}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <ScoreBadge score={r.score} total={r.total} pct={pct} />
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-right text-xs tabular-nums text-slate-500">
+          <>
+            {/* ---- Desktop Table (Hidden on mobile) ---- */}
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3">Student</th>
+                    <th className="px-5 py-3">School</th>
+                    <th className="px-5 py-3">Quiz</th>
+                    <th className="px-5 py-3 text-right">Score</th>
+                    <th className="px-5 py-3 text-right">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {data.recent.map((r) => {
+                    const pct =
+                      r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
+                    return (
+                      <tr
+                        key={r.id}
+                        className="transition hover:bg-slate-50/60"
+                      >
+                        <td className="px-5 py-3.5 font-medium text-slate-800">
+                          {r.profile?.full_name ?? "—"}
+                        </td>
+                        <td className="max-w-50 truncate px-5 py-3.5 text-slate-600">
+                          {r.profile?.school ?? "—"}
+                        </td>
+                        <td className="max-w-50 truncate px-5 py-3.5 text-slate-600">
+                          {r.quiz?.title ?? "—"}
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <ScoreBadge score={r.score} total={r.total} pct={pct} />
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-right text-xs tabular-nums text-slate-500">
+                          {new Date(r.submitted_at).toLocaleDateString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                          })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ---- Mobile Stacked Cards (Hidden on desktop) ---- */}
+            <div className="divide-y divide-slate-100 sm:hidden">
+              {data.recent.map((r) => {
+                const pct =
+                  r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
+                return (
+                  <div key={r.id} className="flex flex-col gap-2 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-slate-800">
+                          {r.profile?.full_name ?? "Unknown Student"}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-slate-500">
+                          <BookOpen className="h-3 w-3 shrink-0" />
+                          {r.profile?.school ?? "No school"}
+                        </div>
+                      </div>
+                      <ScoreBadge score={r.score} total={r.total} pct={pct} />
+                    </div>
+
+                    <div className="mt-1 flex items-center justify-between gap-2 rounded-lg bg-slate-50 p-2.5 text-xs text-slate-600">
+                      <div className="flex items-center gap-1.5 truncate font-medium">
+                        <Library className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">
+                          {r.quiz?.title ?? "Deleted Quiz"}
+                        </span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1 text-[10px] tabular-nums text-slate-500">
+                        <Calendar className="h-3 w-3 shrink-0" />
                         {new Date(r.submitted_at).toLocaleDateString("en-GB", {
                           day: "2-digit",
                           month: "short",
                         })}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </section>
     </div>
@@ -441,15 +494,17 @@ function Stat({
   } as const;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+    <div className="flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md">
       <div className={`grid h-9 w-9 place-items-center rounded-xl ${tones[tone]}`}>
         {icon}
       </div>
-      <div className="mt-3 text-2xl font-bold tabular-nums tracking-tight text-slate-900">
-        {value}
-      </div>
-      <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-        {label}
+      <div>
+        <div className="mt-3 text-2xl font-bold tabular-nums tracking-tight text-slate-900">
+          {value}
+        </div>
+        <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          {label}
+        </div>
       </div>
     </div>
   );
@@ -511,13 +566,13 @@ function ScoreBadge({
 }) {
   const tone =
     pct >= 75
-      ? "bg-emerald-50 text-emerald-700"
+      ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
       : pct >= 50
-        ? "bg-amber-50 text-amber-700"
-        : "bg-red-50 text-red-700";
+        ? "bg-amber-50 text-amber-700 border border-amber-100"
+        : "bg-red-50 text-red-700 border border-red-100";
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${tone}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold tabular-nums shadow-sm ${tone}`}
     >
       {score}/{total}
     </span>

@@ -8,7 +8,6 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
-  Languages,
   AlertTriangle,
   CheckCircle2,
   XCircle,
@@ -21,11 +20,13 @@ import {
   ShieldAlert,
   Lock,
 } from "lucide-react";
-import { formatCountdown, getQuizWindow } from "@/lib/quiz-window";
+import { formatCountdown } from "@/lib/quiz-window";
 
 /* ------------------------------------------------------------------ */
-/*  Types (mirror the API route)                                      */
+/*  Types                                                             */
 /* ------------------------------------------------------------------ */
+
+type Medium = "si" | "en";
 
 interface QuizMeta {
   id: string;
@@ -34,7 +35,7 @@ interface QuizMeta {
   scheduled_at: string;
   duration_minutes: number;
   question_count: number;
-  medium?: "si" | "en";
+  medium?: Medium;
 }
 
 interface WindowMeta {
@@ -70,11 +71,7 @@ interface AttemptMeta {
   submitted_at: string;
 }
 
-type UnavailableReason =
-  | "not_started"
-  | "expired"
-  | "unpublished"
-  | "wrong_medium";
+type UnavailableReason = "not_started" | "expired" | "unpublished";
 
 type ApiResponse =
   | { mode: "exam"; quiz: QuizMeta; window: WindowMeta; questions: ExamQuestion[] }
@@ -98,45 +95,47 @@ export default function QuizPage() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lang, setLang] = useState<"si" | "en">("si");
+
+  const fetchQuiz = useCallback(async (): Promise<ApiResponse> => {
+    const res = await fetch(`/api/quiz/${quizId}`, { cache: "no-store" });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error ?? `HTTP ${res.status}`);
+    }
+    return res.json();
+  }, [quizId]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/quiz/${quizId}`, { cache: "no-store" });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error ?? `HTTP ${res.status}`);
-      }
-      setData(await res.json());
-    } catch (e: any) {
-      setError(e.message ?? "Unknown error");
+      setData(await fetchQuiz());
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
     }
-  }, [quizId]);
+  }, [fetchQuiz]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
 
-  /* Language preference — quiz medium first, then saved pref */
-  useEffect(() => {
-    if (!data) return;
-    const quizMedium = data.quiz.medium;
-    if (quizMedium === "si" || quizMedium === "en") {
-      setLang(quizMedium);
-      localStorage.setItem("quiz_lang", quizMedium);
-      return;
-    }
-    const saved = localStorage.getItem("quiz_lang");
-    if (saved === "si" || saved === "en") setLang(saved);
-  }, [data]);
+    const fetchInitialQuiz = async () => {
+      try {
+        const result = await fetchQuiz();
+        if (!cancelled) setData(result);
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
 
-  useEffect(() => {
-    localStorage.setItem("quiz_lang", lang);
-  }, [lang]);
+    void fetchInitialQuiz();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchQuiz]);
 
   if (loading) return <CenterSpinner label="Loading quiz…" />;
   if (error) return <ErrorView message={error} onRetry={load} />;
@@ -152,6 +151,12 @@ export default function QuizPage() {
     );
   }
 
+  /**
+   * Language is FIXED to the quiz's medium.
+   * No toggle — students only ever see their own registered medium.
+   */
+  const lang: Medium = data.quiz.medium === "en" ? "en" : "si";
+
   if (data.mode === "review") {
     return (
       <ReviewView
@@ -159,7 +164,6 @@ export default function QuizPage() {
         attempt={data.attempt}
         questions={data.questions}
         lang={lang}
-        onToggleLang={setLang}
       />
     );
   }
@@ -170,7 +174,6 @@ export default function QuizPage() {
       window={data.window}
       questions={data.questions}
       lang={lang}
-      onToggleLang={setLang}
       onSubmitted={() => {
         load();
         router.refresh();
@@ -188,14 +191,12 @@ function ExamView({
   window: windowMeta,
   questions,
   lang,
-  onToggleLang,
   onSubmitted,
 }: {
   quiz: QuizMeta;
   window: WindowMeta;
   questions: ExamQuestion[];
-  lang: "si" | "en";
-  onToggleLang: (l: "si" | "en") => void;
+  lang: Medium;
   onSubmitted: () => void;
 }) {
   const storageKey = `quiz_progress_${quiz.id}`;
@@ -216,9 +217,11 @@ function ExamView({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const startedAtRef = useRef<number>(
-    Date.now() - (quiz.duration_minutes * 60 - windowMeta.remaining_seconds) * 1000
-  );
+  const startedAtRef = useRef<number>(0);
+  useEffect(() => {
+    startedAtRef.current =
+      Date.now() - (quiz.duration_minutes * 60 - windowMeta.remaining_seconds) * 1000;
+  }, [quiz.duration_minutes, windowMeta.remaining_seconds]);
   const submittedRef = useRef(false);
 
   /* Autosave */
@@ -257,8 +260,8 @@ function ExamView({
         }
         localStorage.removeItem(storageKey);
         onSubmitted();
-      } catch (e: any) {
-        setSubmitError(e.message ?? "Submit failed");
+      } catch (e: unknown) {
+        setSubmitError(e instanceof Error ? e.message : "Submit failed");
         submittedRef.current = false;
         setSubmitting(false);
       }
@@ -303,7 +306,7 @@ function ExamView({
         <div className="min-w-0">
           <Link
             href="/student/dashboard"
-            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-slate-800"
+            className="inline-flex items-center gap-1 py-0.5 text-xs font-medium text-slate-500 transition hover:text-slate-800"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Back to dashboard
           </Link>
@@ -313,14 +316,11 @@ function ExamView({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            onClick={() => onToggleLang(lang === "si" ? "en" : "si")}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 sm:px-3"
-            title="Toggle language"
-          >
-            <Languages className="h-3.5 w-3.5" />
-            {lang === "si" ? "English" : "සිංහල"}
-          </button>
+          {/* Medium badge — informational only, no toggle */}
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+            <Globe className="h-3 w-3" />
+            {lang === "si" ? "Sinhala" : "English"}
+          </span>
 
           <TimerPill
             remaining={remaining}
@@ -333,12 +333,8 @@ function ExamView({
       <div className="mb-4">
         <div className="flex items-center justify-between gap-3 text-xs">
           <span className="inline-flex items-center gap-1.5 text-slate-500">
-            <span className="font-medium text-slate-700">
-              {answeredCount}
-            </span>
-            <span>
-              of {questions.length} answered
-            </span>
+            <span className="font-medium text-slate-700">{answeredCount}</span>
+            <span>of {questions.length} answered</span>
           </span>
           <span className="font-medium tabular-nums text-slate-500">
             Question {current + 1} / {questions.length}
@@ -354,9 +350,8 @@ function ExamView({
 
       <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
         {/* ============ Question card ============ */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          {/* Header row */}
-          <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
                 {q.topic}
@@ -367,14 +362,12 @@ function ExamView({
             </div>
           </div>
 
-          {/* Question text */}
           <div className="prose prose-slate max-w-none">
             <p className="whitespace-pre-wrap text-base font-medium leading-relaxed text-slate-900 sm:text-[17px]">
               {lang === "si" ? q.text_si : q.text_en ?? q.text_si}
             </p>
           </div>
 
-          {/* Image */}
           {q.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -384,7 +377,6 @@ function ExamView({
             />
           )}
 
-          {/* Options */}
           <div className="mt-5 space-y-2">
             {(lang === "si" ? q.options_si : q.options_en).map((opt, i) => {
               if (!opt) return null;
@@ -399,14 +391,14 @@ function ExamView({
                       [q.id]: selected ? null : value,
                     }))
                   }
-                  className={`flex w-full items-start gap-3 rounded-xl border p-3.5 text-left transition sm:p-3 ${
+                  className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition active:scale-[0.99] sm:p-3 ${
                     selected
                       ? "border-sky-400 bg-sky-50/60 shadow-sm shadow-sky-500/5"
                       : "border-slate-200 hover:border-sky-200 hover:bg-slate-50/60 active:bg-slate-100"
                   }`}
                 >
                   <span
-                    className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold tabular-nums transition sm:h-6 sm:w-6 ${
+                    className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold tabular-nums transition sm:h-6 sm:w-6 ${
                       selected
                         ? "bg-sky-500 text-white"
                         : "bg-slate-100 text-slate-600"
@@ -422,12 +414,11 @@ function ExamView({
             })}
           </div>
 
-          {/* Nav buttons */}
           <div className="mt-6 flex items-center justify-between gap-3">
             <button
               onClick={() => setCurrent((c) => Math.max(0, c - 1))}
               disabled={current === 0}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 sm:py-2.5"
             >
               <ChevronLeft className="h-4 w-4" /> Previous
             </button>
@@ -437,7 +428,7 @@ function ExamView({
                 onClick={() =>
                   setCurrent((c) => Math.min(questions.length - 1, c + 1))
                 }
-                className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:py-2.5"
               >
                 Next <ChevronRight className="h-4 w-4" />
               </button>
@@ -445,7 +436,7 @@ function ExamView({
               <button
                 onClick={() => setConfirmOpen(true)}
                 disabled={submitting}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:opacity-50 sm:py-2.5"
               >
                 <Send className="h-4 w-4" /> Submit
               </button>
@@ -465,7 +456,6 @@ function ExamView({
               </span>
             </div>
 
-            {/* Palette grid */}
             <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-8 lg:grid-cols-5">
               {questions.map((qq, i) => {
                 const isAnswered = answers[qq.id] != null;
@@ -475,10 +465,8 @@ function ExamView({
                     key={qq.id}
                     onClick={() => setCurrent(i)}
                     aria-label={`Go to question ${i + 1}`}
-                    className={`relative grid h-9 w-9 place-items-center rounded-lg text-xs font-bold tabular-nums transition active:scale-95 ${
-                      isCurrent
-                        ? "ring-2 ring-sky-500 ring-offset-2"
-                        : ""
+                    className={`relative grid h-10 w-10 place-items-center rounded-lg text-xs font-bold tabular-nums transition active:scale-95 sm:h-9 sm:w-9 ${
+                      isCurrent ? "ring-2 ring-sky-500 ring-offset-2" : ""
                     } ${
                       isAnswered
                         ? "bg-sky-500 text-white hover:bg-sky-600"
@@ -494,7 +482,6 @@ function ExamView({
               })}
             </div>
 
-            {/* Legend */}
             <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3 text-[10px] text-slate-500">
               <span className="inline-flex items-center gap-1">
                 <span className="h-2 w-2 rounded-full bg-sky-500" />
@@ -509,7 +496,7 @@ function ExamView({
             <button
               onClick={() => setConfirmOpen(true)}
               disabled={submitting}
-              className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:opacity-50"
+              className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:opacity-50 sm:py-2.5"
             >
               <Send className="h-4 w-4" /> Submit quiz
             </button>
@@ -517,8 +504,8 @@ function ExamView({
             <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-slate-500">
               <Lock className="mt-0.5 h-3 w-3 shrink-0" />
               <span>
-                Your answers save automatically. The quiz submits itself
-                when time runs out.
+                Your answers save automatically. The quiz submits itself when
+                time runs out.
               </span>
             </p>
           </div>
@@ -535,7 +522,7 @@ function ExamView({
             Submit your quiz?
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            You've answered{" "}
+            You&apos;ve answered{" "}
             <strong className="font-semibold text-slate-900">
               {answeredCount}
             </strong>{" "}
@@ -554,7 +541,7 @@ function ExamView({
           )}
 
           <p className="mt-3 text-xs text-slate-500">
-            You can't change your answers after submitting.
+            You can&apos;t change your answers after submitting.
           </p>
 
           {submitError && (
@@ -564,18 +551,18 @@ function ExamView({
             </div>
           )}
 
-          <div className="mt-5 flex gap-2">
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
             <button
               onClick={() => setConfirmOpen(false)}
               disabled={submitting}
-              className="inline-flex flex-1 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] disabled:opacity-50 sm:py-2.5"
             >
               Keep working
             </button>
             <button
               onClick={() => submit(false)}
               disabled={submitting}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:opacity-50"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:opacity-50 sm:py-2.5"
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -605,13 +592,13 @@ function EmptyQuestionsView({ quiz }: { quiz: QuizMeta }) {
         No questions yet
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-slate-600">
-        This quiz doesn't have any questions attached. Please contact an
+        This quiz doesn&apos;t have any questions attached. Please contact an
         administrator.
       </p>
       <p className="mt-3 text-xs text-slate-400">{quiz.title}</p>
       <Link
         href="/student/dashboard"
-        className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600"
+        className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:py-2.5"
       >
         <ArrowLeft className="h-4 w-4" /> Back to dashboard
       </Link>
@@ -628,13 +615,11 @@ function ReviewView({
   attempt,
   questions,
   lang,
-  onToggleLang,
 }: {
   quiz: QuizMeta;
   attempt: AttemptMeta;
   questions: ReviewQuestion[];
-  lang: "si" | "en";
-  onToggleLang: (l: "si" | "en") => void;
+  lang: Medium;
 }) {
   const pct =
     attempt.total > 0 ? Math.round((attempt.score / attempt.total) * 100) : 0;
@@ -646,7 +631,7 @@ function ReviewView({
     <div className="mx-auto max-w-3xl px-4 py-5 sm:px-6 sm:py-6">
       <Link
         href="/student/dashboard"
-        className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-slate-800"
+        className="inline-flex items-center gap-1 py-0.5 text-xs font-medium text-slate-500 transition hover:text-slate-800"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Back to dashboard
       </Link>
@@ -657,7 +642,6 @@ function ReviewView({
 
       {/* ============ Score card ============ */}
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {/* Score strip */}
         <div
           className={`h-1.5 ${
             grade === "emerald"
@@ -668,7 +652,7 @@ function ReviewView({
           }`}
         />
         <div className="p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-3 sm:gap-4">
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 Your score
@@ -697,9 +681,8 @@ function ReviewView({
               </div>
             </div>
 
-            {/* Percentage ring */}
             <div
-              className={`grid h-20 w-20 shrink-0 place-items-center rounded-full text-2xl font-bold tabular-nums tracking-tight ${
+              className={`grid h-16 w-16 shrink-0 place-items-center rounded-full text-xl font-bold tabular-nums tracking-tight sm:h-20 sm:w-20 sm:text-2xl ${
                 grade === "emerald"
                   ? "bg-emerald-50 text-emerald-700"
                   : grade === "amber"
@@ -712,13 +695,10 @@ function ReviewView({
           </div>
 
           <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4">
-            <button
-              onClick={() => onToggleLang(lang === "si" ? "en" : "si")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
-            >
-              <Languages className="h-3.5 w-3.5" />
-              {lang === "si" ? "Switch to English" : "සිංහල බලන්න"}
-            </button>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+              <Globe className="h-3 w-3" />
+              {lang === "si" ? "Sinhala" : "English"}
+            </span>
           </div>
         </div>
       </div>
@@ -738,15 +718,13 @@ function ReviewView({
               key={q.id}
               className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
             >
-              {/* Status strip */}
               <div
                 className={`h-1 ${
                   q.is_correct ? "bg-emerald-500" : "bg-red-500"
                 }`}
               />
 
-              <div className="p-5">
-                {/* Header row */}
+              <div className="p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span
@@ -773,12 +751,10 @@ function ReviewView({
                   )}
                 </div>
 
-                {/* Question text */}
                 <p className="mt-3 whitespace-pre-wrap text-sm font-medium leading-relaxed text-slate-900 sm:text-base">
                   {text}
                 </p>
 
-                {/* Image */}
                 {q.image_url && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -788,7 +764,6 @@ function ReviewView({
                   />
                 )}
 
-                {/* Options with highlighting */}
                 <div className="mt-4 space-y-2">
                   {opts.map((opt, idx) => {
                     if (!opt) return null;
@@ -838,9 +813,8 @@ function ReviewView({
                   })}
                 </div>
 
-                {/* Explanation */}
                 {explanation && (
-                  <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/50 p-4">
+                  <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/50 p-3 sm:p-4">
                     <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-sky-800">
                       <Library className="h-3 w-3" />
                       Explanation
@@ -859,7 +833,7 @@ function ReviewView({
       <div className="mt-8 flex justify-center">
         <Link
           href="/student/leaderboard"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 active:scale-[0.98] sm:py-2.5"
         >
           <Flag className="h-4 w-4" /> View leaderboard
         </Link>
@@ -907,14 +881,6 @@ function UnavailableView({
           desc: "The time window for this quiz has closed.",
           showCountdown: false,
         };
-      case "wrong_medium":
-        return {
-          icon: <Globe className="h-7 w-7" />,
-          tone: "amber" as const,
-          title: "Different medium",
-          desc: "This quiz is for a different medium than the one you registered for.",
-          showCountdown: false,
-        };
       case "unpublished":
       default:
         return {
@@ -942,9 +908,7 @@ function UnavailableView({
       <h1 className="mt-5 text-xl font-bold tracking-tight text-slate-900">
         {meta.title}
       </h1>
-      <p className="mt-2 text-sm leading-relaxed text-slate-600">
-        {meta.desc}
-      </p>
+      <p className="mt-2 text-sm leading-relaxed text-slate-600">{meta.desc}</p>
 
       {meta.showCountdown && (
         <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold tabular-nums text-amber-800">
@@ -957,7 +921,7 @@ function UnavailableView({
 
       <Link
         href="/student/dashboard"
-        className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600"
+        className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:py-2.5"
       >
         <ArrowLeft className="h-4 w-4" /> Back to dashboard
       </Link>
@@ -1006,7 +970,7 @@ function Modal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-900/5"
+        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-slate-900/5 sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-center">{children}</div>
@@ -1017,7 +981,7 @@ function Modal({
 
 function CenterSpinner({ label }: { label: string }) {
   return (
-    <div className="grid min-h-[60vh] place-items-center">
+    <div className="grid min-h-dvh place-items-center px-4">
       <div className="flex flex-col items-center gap-2 text-slate-500">
         <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
         <span className="text-sm">{label}</span>
@@ -1034,20 +998,22 @@ function ErrorView({
   onRetry: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-md px-4 py-16 text-center">
-      <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-600">
-        <XCircle className="h-6 w-6" />
+    <div className="grid min-h-dvh place-items-center px-4">
+      <div className="mx-auto max-w-md text-center">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-600">
+          <XCircle className="h-6 w-6" />
+        </div>
+        <h2 className="mt-4 text-lg font-semibold text-slate-900">
+          Couldn&apos;t load quiz
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">{message}</p>
+        <button
+          onClick={onRetry}
+          className="mt-6 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] sm:py-2.5"
+        >
+          <RefreshCw className="h-4 w-4" /> Try again
+        </button>
       </div>
-      <h2 className="mt-4 text-lg font-semibold text-slate-900">
-        Couldn't load quiz
-      </h2>
-      <p className="mt-1 text-sm text-slate-600">{message}</p>
-      <button
-        onClick={onRetry}
-        className="mt-6 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-      >
-        <RefreshCw className="h-4 w-4" /> Try again
-      </button>
     </div>
   );
 }

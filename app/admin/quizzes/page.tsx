@@ -17,18 +17,18 @@ import {
   EyeOff,
   AlertTriangle,
   CalendarClock,
-  Languages,
-  Globe,
-  ArrowRight,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getQuizWindow } from "@/lib/quiz-window";
+import QuestionBankSelectorModal, {
+  type QuestionLite,
+} from "@/components/QuestionBankSelectorModal";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
 /* ------------------------------------------------------------------ */
-
-type Medium = "si" | "en";
 
 interface QuizRow {
   id: string;
@@ -37,7 +37,6 @@ interface QuizRow {
   scheduled_at: string;
   duration_minutes: number;
   is_published: boolean;
-  medium: Medium;
   created_at: string;
   question_count?: number;
 }
@@ -45,10 +44,9 @@ interface QuizRow {
 interface Draft {
   title: string;
   description: string;
-  scheduled_at: string; // datetime-local input format
+  scheduled_at: string;
   duration_minutes: number;
   is_published: boolean;
-  medium: Medium;
 }
 
 const emptyDraft: Draft = {
@@ -57,7 +55,6 @@ const emptyDraft: Draft = {
   scheduled_at: "",
   duration_minutes: 30,
   is_published: false,
-  medium: "si",
 };
 
 /* ------------------------------------------------------------------ */
@@ -73,13 +70,10 @@ export default function QuizzesPage() {
   const [deleting, setDeleting] = useState<QuizRow | null>(null);
 
   async function load() {
-    setLoading(true);
-    setError(null);
-
     const { data, error: dbErr } = await supabase
       .from("quizzes")
       .select(
-        "id, title, description, scheduled_at, duration_minutes, is_published, medium, created_at"
+        "id, title, description, scheduled_at, duration_minutes, is_published, created_at"
       )
       .order("scheduled_at", { ascending: false });
 
@@ -89,7 +83,6 @@ export default function QuizzesPage() {
       return;
     }
 
-    // Fetch question counts in parallel
     const ids = (data ?? []).map((q) => q.id);
     let counts: Record<string, number> = {};
     if (ids.length > 0) {
@@ -97,7 +90,7 @@ export default function QuizzesPage() {
         .from("quiz_questions")
         .select("quiz_id")
         .in("quiz_id", ids);
-      counts = (links ?? []).reduce<Record<string, number>>((acc, l: any) => {
+      counts = (links ?? []).reduce<Record<string, number>>((acc, l) => {
         acc[l.quiz_id] = (acc[l.quiz_id] ?? 0) + 1;
         return acc;
       }, {});
@@ -113,7 +106,7 @@ export default function QuizzesPage() {
   }
 
   useEffect(() => {
-    load();
+    void Promise.resolve().then(load);
   }, []);
 
   async function togglePublish(q: QuizRow) {
@@ -143,7 +136,7 @@ export default function QuizzesPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
       {/* ============ Header ============ */}
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div className="flex items-start gap-3">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-50 text-sky-600">
             <CalendarClock className="h-6 w-6" />
@@ -160,7 +153,7 @@ export default function QuizzesPage() {
 
         <button
           onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:w-auto sm:py-2.5"
         >
           <Plus className="h-4 w-4" /> New quiz
         </button>
@@ -234,16 +227,16 @@ export default function QuizzesPage() {
           <p className="mt-3 truncate rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
             {deleting.title}
           </p>
-          <div className="mt-5 flex gap-2">
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
             <button
               onClick={() => setDeleting(null)}
-              className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
+              className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] sm:py-2.5"
             >
               Cancel
             </button>
             <button
               onClick={handleDelete}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-500/25 transition hover:bg-red-700 active:scale-[0.98]"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-red-500/25 transition hover:bg-red-700 active:scale-[0.98] sm:py-2.5"
             >
               <Trash2 className="h-4 w-4" /> Delete
             </button>
@@ -272,26 +265,29 @@ function QuizCard({
   const w = getQuizWindow(quiz.scheduled_at, quiz.duration_minutes);
   const qCount = quiz.question_count ?? 0;
   const atCap = qCount >= 20;
+  const noQuestions = qCount === 0;
 
   return (
     <div className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-sky-200 hover:shadow-md hover:shadow-sky-100/60 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          {/* Title + badges */}
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate font-semibold text-slate-900">{quiz.title}</h3>
             <StatusBadge isPublished={quiz.is_published} status={w.status} />
-            <MediumBadge medium={quiz.medium} />
+            {noQuestions && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                <AlertTriangle className="h-2.5 w-2.5" />
+                No questions
+              </span>
+            )}
           </div>
 
-          {/* Description */}
           {quiz.description && (
             <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-slate-600">
               {quiz.description}
             </p>
           )}
 
-          {/* Meta row */}
           <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
             <span className="inline-flex items-center gap-1">
               <CalIcon className="h-3.5 w-3.5" />
@@ -320,11 +316,11 @@ function QuizCard({
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Increased touch targets for mobile (h-10 w-10) */}
         <div className="flex shrink-0 flex-col gap-1 sm:flex-row sm:items-center">
           <button
             onClick={onTogglePublish}
-            className={`grid h-9 w-9 place-items-center rounded-lg transition active:scale-95 ${
+            className={`grid h-10 w-10 place-items-center rounded-lg transition active:scale-95 sm:h-9 sm:w-9 ${
               quiz.is_published
                 ? "text-emerald-600 hover:bg-emerald-50"
                 : "text-slate-400 hover:bg-slate-100 hover:text-slate-700"
@@ -340,15 +336,15 @@ function QuizCard({
           </button>
           <button
             onClick={onEdit}
-            className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-sky-50 hover:text-sky-600 active:scale-95"
-            title="Edit"
+            className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 transition hover:bg-sky-50 hover:text-sky-600 active:scale-95 sm:h-9 sm:w-9"
+            title="Edit quiz & questions"
             aria-label="Edit quiz"
           >
             <Pencil className="h-4 w-4" />
           </button>
           <button
             onClick={onDelete}
-            className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 active:scale-95"
+            className="grid h-10 w-10 place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 active:scale-95 sm:h-9 sm:w-9"
             title="Delete"
             aria-label="Delete quiz"
           >
@@ -357,13 +353,16 @@ function QuizCard({
         </div>
       </div>
 
-      {/* Footer link */}
       <div className="mt-3 border-t border-slate-100 pt-3">
         <Link
           href={`/admin/quizzes/${quiz.id}/questions`}
-          className="inline-flex items-center gap-1 text-sm font-semibold text-sky-600 transition hover:text-sky-700"
+          className={`inline-flex items-center gap-1 py-1 text-sm font-semibold transition ${
+            noQuestions
+              ? "text-amber-600 hover:text-amber-700"
+              : "text-sky-600 hover:text-sky-700"
+          }`}
         >
-          Manage questions
+          {noQuestions ? "Add questions" : "Manage questions"}
           <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
         </Link>
       </div>
@@ -372,7 +371,7 @@ function QuizCard({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Status + medium badges                                            */
+/*  Status badge                                                      */
 /* ------------------------------------------------------------------ */
 
 function StatusBadge({
@@ -412,25 +411,8 @@ function StatusBadge({
   );
 }
 
-function MediumBadge({ medium }: { medium: Medium }) {
-  if (medium === "si") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
-        <Languages className="h-2.5 w-2.5" />
-        Sinhala
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
-      <Globe className="h-2.5 w-2.5" />
-      English
-    </span>
-  );
-}
-
 /* ------------------------------------------------------------------ */
-/*  Create / edit modal                                               */
+/*  Create / edit modal (2-column layout)                             */
 /* ------------------------------------------------------------------ */
 
 function QuizModal({
@@ -450,11 +432,64 @@ function QuizModal({
       scheduled_at: toLocalInput(initial.scheduled_at),
       duration_minutes: initial.duration_minutes,
       is_published: initial.is_published,
-      medium: initial.medium ?? "si",
     };
   });
+
+  const [selectedQuestions, setSelectedQuestions] = useState<QuestionLite[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [loadingQuestions, setLoadingQuestions] = useState(!!initial);
+  
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /* Load existing questions if editing */
+  useEffect(() => {
+    if (!initial) return;
+    (async () => {
+      const { data, error: dbErr } = await supabase
+        .from("quiz_questions")
+        .select(`
+          order_index,
+          question:questions (id, topic, question_text_si, question_text_en)
+        `)
+        .eq("quiz_id", initial.id)
+        .order("order_index", { ascending: true });
+
+      if (dbErr) {
+        setError(dbErr.message);
+      } else {
+        const questions = (data ?? []) as {
+          question: QuestionLite | QuestionLite[] | null;
+        }[];
+        setSelectedQuestions(
+          questions
+            .flatMap((row) =>
+              row.question == null
+                ? []
+                : Array.isArray(row.question)
+                  ? row.question
+                  : [row.question]
+            )
+            .filter((question): question is QuestionLite => question !== null)
+        );
+      }
+      setLoadingQuestions(false);
+    })();
+  }, [initial]);
+
+  function moveQuestion(index: number, dir: -1 | 1) {
+    const target = index + dir;
+    if (target < 0 || target >= selectedQuestions.length) return;
+    setSelectedQuestions((prev) => {
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  function removeQuestion(id: string) {
+    setSelectedQuestions((prev) => prev.filter((q) => q.id !== id));
+  }
 
   async function save() {
     setError(null);
@@ -469,27 +504,66 @@ function QuizModal({
       scheduled_at: new Date(draft.scheduled_at).toISOString(),
       duration_minutes: draft.duration_minutes,
       is_published: draft.is_published,
-      medium: draft.medium,
     };
 
     setSaving(true);
-    const { error: err } = initial
-      ? await supabase.from("quizzes").update(payload).eq("id", initial.id)
-      : await supabase.from("quizzes").insert(payload);
-    setSaving(false);
 
-    if (err) return setError(err.message);
+    let quizId = initial?.id;
+
+    // 1. Save quiz
+    if (initial) {
+      const { error: err } = await supabase
+        .from("quizzes")
+        .update(payload)
+        .eq("id", quizId);
+      if (err) { setError(err.message); setSaving(false); return; }
+    } else {
+      const { data, error: err } = await supabase
+        .from("quizzes")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (err || !data) { setError(err?.message ?? "Failed"); setSaving(false); return; }
+      quizId = data.id;
+    }
+
+    // 2. Sync questions
+    if (quizId) {
+      // Remove all existing links
+      await supabase.from("quiz_questions").delete().eq("quiz_id", quizId);
+      
+      // Insert new links
+      if (selectedQuestions.length > 0) {
+        const rows = selectedQuestions.map((q, i) => ({
+          quiz_id: quizId,
+          question_id: q.id,
+          order_index: i,
+        }));
+        const { error: linkErr } = await supabase.from("quiz_questions").insert(rows);
+        if (linkErr) {
+          setError(`Quiz saved, but linking questions failed: ${linkErr.message}`);
+          setSaving(false);
+          // Still call onSaved so they don't lose the quiz
+          onSaved();
+          return;
+        }
+      }
+    }
+
+    setSaving(false);
     onSaved();
   }
 
   const inputBase =
     "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100";
 
+  const slotsLeft = 20 - selectedQuestions.length;
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-3 backdrop-blur-sm sm:p-4">
-      <div className="mx-auto my-4 w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5 sm:my-8">
+      <div className="mx-auto my-4 w-full max-w-4xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5 sm:my-8">
         {/* ============ Header ============ */}
-        <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+        <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <div
               className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
@@ -498,11 +572,7 @@ function QuizModal({
                   : "bg-sky-50 text-sky-600"
               }`}
             >
-              {initial ? (
-                <Pencil className="h-5 w-5" />
-              ) : (
-                <Plus className="h-5 w-5" />
-              )}
+              {initial ? <Pencil className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
             </div>
             <div className="min-w-0">
               <h2 className="text-base font-bold tracking-tight text-slate-900 sm:text-lg">
@@ -510,7 +580,7 @@ function QuizModal({
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
                 {initial
-                  ? "Update the schedule and settings"
+                  ? "Update details and manage questions"
                   : "Schedule a new exam session"}
               </p>
             </div>
@@ -524,130 +594,203 @@ function QuizModal({
           </button>
         </header>
 
-        {/* ============ Body ============ */}
-        <div className="space-y-4 px-4 py-5 sm:px-5">
-          {/* Medium selector */}
-          <div>
-            <Label label="Medium" hint="Required" />
-            <div className="grid grid-cols-2 gap-2">
-              <MediumOption
-                active={draft.medium === "si"}
-                onClick={() => setDraft({ ...draft, medium: "si" })}
-                emoji="🇱🇰"
-                title="Sinhala"
-                subtitle="සිංහල මාධ්‍යය"
-              />
-              <MediumOption
-                active={draft.medium === "en"}
-                onClick={() => setDraft({ ...draft, medium: "en" })}
-                emoji="🌐"
-                title="English"
-                subtitle="English medium"
+        {/* ============ Body (2 columns) ============ */}
+        <div className="grid grid-cols-1 divide-y divide-slate-100 md:grid-cols-[1fr_320px] md:divide-x md:divide-y-0">
+          
+          {/* LEFT: Details */}
+          <div className="space-y-4 p-4 sm:p-6">
+            <div>
+              <Label label="Title" hint="Required" />
+              <input
+                className={inputBase}
+                value={draft.title}
+                onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                placeholder="e.g. Quiz 01 — Physics"
+                autoFocus
               />
             </div>
-            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-              {draft.medium === "si"
-                ? "Only Sinhala-medium students will see this quiz."
-                : "Only English-medium students will see this quiz."}
-            </p>
-          </div>
 
-          {/* Title */}
-          <div>
-            <Label label="Title" hint="Required" />
-            <input
-              className={inputBase}
-              value={draft.title}
-              onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-              placeholder="e.g. Quiz 01 — Physics"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <Label label="Description" hint="Optional" />
-            <textarea
-              rows={2}
-              className={`${inputBase} resize-y`}
-              placeholder="Short summary for students…"
-              value={draft.description}
-              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-            />
-          </div>
-
-          {/* Schedule */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <Label label="Start time" hint="Required" />
-              <input
-                type="datetime-local"
-                className={inputBase}
-                value={draft.scheduled_at}
+              <Label label="Description" hint="Optional" />
+              <textarea
+                rows={2}
+                className={`${inputBase} resize-y`}
+                placeholder="Short summary for students…"
+                value={draft.description}
                 onChange={(e) =>
-                  setDraft({ ...draft, scheduled_at: e.target.value })
+                  setDraft({ ...draft, description: e.target.value })
                 }
               />
             </div>
-            <div>
-              <Label label="Duration" hint="Minutes (5–300)" />
-              <input
-                type="number"
-                min={5}
-                max={300}
-                className={inputBase}
-                value={draft.duration_minutes}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    duration_minutes: Number(e.target.value) || 0,
-                  })
-                }
-              />
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <Label label="Start time" hint="Required" />
+                <input
+                  type="datetime-local"
+                  className={inputBase}
+                  value={draft.scheduled_at}
+                  onChange={(e) =>
+                    setDraft({ ...draft, scheduled_at: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label label="Duration" hint="Minutes (5–300)" />
+                <input
+                  type="number"
+                  min={5}
+                  max={300}
+                  className={inputBase}
+                  value={draft.duration_minutes}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      duration_minutes: Number(e.target.value) || 0,
+                    })
+                  }
+                />
+              </div>
             </div>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 transition hover:bg-slate-50">
+              <input
+                type="checkbox"
+                checked={draft.is_published}
+                onChange={(e) =>
+                  setDraft({ ...draft, is_published: e.target.checked })
+                }
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-sky-500 focus:ring-2 focus:ring-sky-100"
+              />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-slate-800">
+                  Publish now
+                </div>
+                <div className="mt-0.5 text-xs leading-relaxed text-slate-500">
+                  Students will see this quiz on their dashboard once published.
+                </div>
+              </div>
+            </label>
           </div>
 
-          {/* Publish toggle */}
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 transition hover:bg-slate-50">
-            <input
-              type="checkbox"
-              checked={draft.is_published}
-              onChange={(e) =>
-                setDraft({ ...draft, is_published: e.target.checked })
-              }
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-sky-500 focus:ring-2 focus:ring-sky-100"
-            />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-slate-800">
-                Publish now
+          {/* RIGHT: Questions Inline */}
+          <div className="bg-slate-50/50 p-4 sm:p-6 md:rounded-br-2xl">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Questions</h3>
+                <p className="text-[11px] text-slate-500">
+                  {selectedQuestions.length} of 20 selected
+                </p>
               </div>
-              <div className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                Students will see this quiz on their dashboard once published.
-              </div>
+              <button
+                onClick={() => setPickerOpen(true)}
+                disabled={slotsLeft <= 0}
+                className="inline-flex items-center gap-1 rounded-lg bg-sky-500 px-3 py-2 text-xs font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none sm:px-2.5 sm:py-1.5"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add
+              </button>
             </div>
-          </label>
 
-          {/* Error */}
-          {error && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{error}</span>
+            {/* Capacity bar */}
+            <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className={`h-full transition-all duration-300 ${
+                  slotsLeft === 0 ? "bg-red-500" : "bg-sky-500"
+                }`}
+                style={{ width: `${(selectedQuestions.length / 20) * 100}%` }}
+              />
             </div>
-          )}
+
+            {loadingQuestions ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+              </div>
+            ) : selectedQuestions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white py-8 text-center">
+                <Library className="h-6 w-6 text-slate-300" />
+                <p className="mt-2 text-xs font-medium text-slate-500">No questions selected.</p>
+                <button
+                  onClick={() => setPickerOpen(true)}
+                  className="mt-3 text-xs font-semibold text-sky-600 hover:underline"
+                >
+                  Pick from bank
+                </button>
+              </div>
+            ) : (
+              <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                {selectedQuestions.map((q, i) => (
+                  <div
+                    key={q.id}
+                    className="flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm"
+                  >
+                    <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="inline-flex items-center rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-700">
+                        {q.topic}
+                      </span>
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-700">
+                        {q.question_text_si || q.question_text_en}
+                      </p>
+                    </div>
+                    
+                    {/* Enlarged touch targets for reordering/removing */}
+                    <div className="flex shrink-0 gap-0.5">
+                      <div className="flex flex-col">
+                        <button
+                          onClick={() => moveQuestion(i, -1)}
+                          disabled={i === 0}
+                          className="grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-sky-600 disabled:opacity-30"
+                          title="Move up"
+                        >
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => moveQuestion(i, 1)}
+                          disabled={i === selectedQuestions.length - 1}
+                          className="grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-sky-600 disabled:opacity-30"
+                          title="Move down"
+                        >
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => removeQuestion(q.id)}
+                        className="grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-500"
+                        title="Remove"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
+        {/* ============ Error ============ */}
+        {error && (
+          <div className="mx-4 mb-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 sm:mx-6">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
         {/* ============ Footer ============ */}
-        <footer className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-5">
+        <footer className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-6 rounded-b-2xl">
           <button
             onClick={onClose}
             disabled={saving}
-            className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+            className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:flex-none sm:py-2.5"
           >
             Cancel
           </button>
           <button
             onClick={save}
             disabled={saving}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none sm:flex-none"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none sm:flex-none sm:py-2.5"
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -658,6 +801,19 @@ function QuizModal({
           </button>
         </footer>
       </div>
+
+      {/* ============ Question Bank Selector Modal ============ */}
+      {pickerOpen && (
+        <QuestionBankSelectorModal
+          existingIds={selectedQuestions.map((q) => q.id)}
+          slotsLeft={slotsLeft}
+          onClose={() => setPickerOpen(false)}
+          onAdded={(newQuestions) => {
+            setSelectedQuestions((prev) => [...prev, ...newQuestions]);
+            setPickerOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -676,44 +832,6 @@ function Label({ label, hint }: { label: string; hint?: string }) {
         </span>
       )}
     </div>
-  );
-}
-
-function MediumOption({
-  active,
-  onClick,
-  emoji,
-  title,
-  subtitle,
-}: {
-  active: boolean;
-  onClick: () => void;
-  emoji: string;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex flex-col items-center gap-1 rounded-xl border-2 p-3 text-center transition active:scale-[0.98] ${
-        active
-          ? "border-sky-500 bg-sky-50"
-          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-      }`}
-    >
-      <span className="text-xl leading-none">{emoji}</span>
-      <span
-        className={`text-sm font-bold ${
-          active ? "text-sky-700" : "text-slate-700"
-        }`}
-      >
-        {title}
-      </span>
-      <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-        {subtitle}
-      </span>
-    </button>
   );
 }
 
@@ -747,11 +865,11 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       </div>
       <h3 className="mt-4 font-semibold text-slate-800">No quizzes yet</h3>
       <p className="mt-1 max-w-sm text-sm text-slate-500">
-        Schedule your first quiz — students will see it once you publish it.
+        Schedule your first quiz — you can pick questions right away.
       </p>
       <button
         onClick={onCreate}
-        className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+        className="mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:w-auto sm:py-2.5"
       >
         <Plus className="h-4 w-4" /> Create first quiz
       </button>

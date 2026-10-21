@@ -41,6 +41,11 @@ interface UserRow {
 }
 
 type Tab = "admins" | "students";
+type ConfirmState =
+  | { kind: "demote"; user: UserRow }
+  | { kind: "promote"; user: UserRow }
+  | { kind: "delete"; user: UserRow }
+  | null;
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                              */
@@ -61,12 +66,7 @@ export default function SuperAdminPage() {
   const [query, setQuery] = useState("");
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [confirm, setConfirm] = useState<
-    | { kind: "demote"; user: UserRow }
-    | { kind: "promote"; user: UserRow }
-    | { kind: "delete"; user: UserRow }
-    | null
-  >(null);
+  const [confirm, setConfirm] = useState<ConfirmState>(null);
 
   /* ---------- Auth + role check ---------- */
 
@@ -88,6 +88,7 @@ export default function SuperAdminPage() {
         .single();
 
       setMeIsSuper(!!profile?.is_super_admin);
+      if (profile?.is_super_admin) await load();
       setLoaded(true);
     })();
   }, [router]);
@@ -109,10 +110,6 @@ export default function SuperAdminPage() {
     setStudents(j.students ?? []);
     setLoading(false);
   }
-
-  useEffect(() => {
-    if (meIsSuper) load();
-  }, [meIsSuper]);
 
   /* ---------- Actions ---------- */
 
@@ -147,8 +144,8 @@ export default function SuperAdminPage() {
         setStudents((s) => [{ ...confirm.user, is_admin: false }, ...s]);
       }
       setConfirm(null);
-    } catch (e: any) {
-      setError(e.message ?? "Unknown error");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unknown error");
       setConfirm(null);
     }
   }
@@ -157,7 +154,7 @@ export default function SuperAdminPage() {
 
   if (!loaded) {
     return (
-      <div className="grid min-h-[60vh] place-items-center">
+      <div className="grid min-h-[60vh] place-items-center px-4">
         <div className="flex flex-col items-center gap-2 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
           <span className="text-sm">Checking permissions…</span>
@@ -198,7 +195,7 @@ export default function SuperAdminPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
       {/* ============ Header ============ */}
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div className="flex items-start gap-3">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700 shadow-sm shadow-amber-500/10">
             <Crown className="h-6 w-6" />
@@ -215,7 +212,7 @@ export default function SuperAdminPage() {
 
         <button
           onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:w-auto sm:py-2.5"
         >
           <Plus className="h-4 w-4" /> New admin
         </button>
@@ -223,10 +220,11 @@ export default function SuperAdminPage() {
 
       {/* ============ Tabs + search ============ */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="inline-flex w-fit rounded-xl border border-slate-200 bg-slate-100/60 p-1 text-sm">
+        {/* Tabs (Full width on mobile) */}
+        <div className="flex w-full rounded-xl border border-slate-200 bg-slate-100/60 p-1 text-sm sm:w-fit">
           <button
             onClick={() => setTab("admins")}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 font-semibold transition ${
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 font-semibold transition sm:flex-none ${
               tab === "admins"
                 ? "bg-white text-slate-900 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
@@ -246,7 +244,7 @@ export default function SuperAdminPage() {
           </button>
           <button
             onClick={() => setTab("students")}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 font-semibold transition ${
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 font-semibold transition sm:flex-none ${
               tab === "students"
                 ? "bg-white text-slate-900 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
@@ -266,10 +264,11 @@ export default function SuperAdminPage() {
           </button>
         </div>
 
-        <div className="relative lg:w-80">
+        {/* Search */}
+        <div className="relative w-full lg:w-80">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
-            className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+            className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:py-2.5"
             placeholder="Search by name, email, or school…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -285,7 +284,7 @@ export default function SuperAdminPage() {
         </div>
       )}
 
-      {/* ============ Table ============ */}
+      {/* ============ List (Table & Mobile Cards) ============ */}
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
           <div className="grid place-items-center py-16">
@@ -301,103 +300,122 @@ export default function SuperAdminPage() {
             onAdd={() => setCreateOpen(true)}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-160 text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-5 py-3">Name</th>
-                  <th className="px-5 py-3">Email</th>
-                  <th className="px-5 py-3">School</th>
-                  <th className="px-5 py-3">Role</th>
-                  <th className="px-5 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map((u) => {
-                  const isMe = u.id === me;
-                  const isSuper = u.is_super_admin;
-                  return (
-                    <tr
-                      key={u.id}
-                      className={`transition ${
-                        isMe ? "bg-amber-50/40" : "hover:bg-slate-50/60"
-                      }`}
-                    >
-                      <td className="px-5 py-3.5">
+          <>
+            {/* ---- Desktop Table ---- */}
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3">Name</th>
+                    <th className="px-5 py-3">Email</th>
+                    <th className="px-5 py-3">School</th>
+                    <th className="px-5 py-3">Role</th>
+                    <th className="px-5 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((u) => {
+                    const isMe = u.id === me;
+                    const isSuper = u.is_super_admin;
+                    return (
+                      <tr
+                        key={u.id}
+                        className={`transition ${
+                          isMe ? "bg-amber-50/40" : "hover:bg-slate-50/60"
+                        }`}
+                      >
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-800">
+                              {u.full_name || "—"}
+                            </span>
+                            {isMe && (
+                              <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                                You
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="max-w-50 truncate px-5 py-3.5 text-slate-600">
+                          {u.email}
+                        </td>
+                        <td className="max-w-50 truncate px-5 py-3.5 text-slate-600">
+                          {u.school || "—"}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <RoleBadge
+                            isAdmin={u.is_admin}
+                            isSuper={u.is_super_admin}
+                          />
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center justify-end gap-1">
+                            <RowActions
+                              u={u}
+                              isMe={isMe}
+                              isSuper={isSuper}
+                              tab={tab}
+                              setConfirm={setConfirm}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ---- Mobile Cards ---- */}
+            <div className="divide-y divide-slate-100 sm:hidden">
+              {filtered.map((u) => {
+                const isMe = u.id === me;
+                const isSuper = u.is_super_admin;
+                return (
+                  <div key={u.id} className="flex flex-col gap-3 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-slate-800">
+                          <span className="truncate font-semibold text-slate-800">
                             {u.full_name || "—"}
                           </span>
                           {isMe && (
-                            <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                            <span className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
                               You
                             </span>
                           )}
                         </div>
-                      </td>
-                      <td className="max-w-55 truncate px-5 py-3.5 text-slate-600">
-                        {u.email}
-                      </td>
-                      <td className="max-w-50 truncate px-5 py-3.5 text-slate-600">
-                        {u.school || "—"}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <RoleBadge
-                          isAdmin={u.is_admin}
-                          isSuper={u.is_super_admin}
-                        />
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-end gap-1">
-                          {tab === "students" && (
-                            <button
-                              onClick={() =>
-                                setConfirm({ kind: "promote", user: u })
-                              }
-                              className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-sky-50 hover:text-sky-600 active:scale-95"
-                              title="Promote to admin"
-                              aria-label="Promote to admin"
-                            >
-                              <UserCog className="h-4 w-4" />
-                            </button>
-                          )}
-                          {tab === "admins" && !isSuper && !isMe && (
-                            <button
-                              onClick={() =>
-                                setConfirm({ kind: "demote", user: u })
-                              }
-                              className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-amber-50 hover:text-amber-600 active:scale-95"
-                              title="Demote to student"
-                              aria-label="Demote to student"
-                            >
-                              <ShieldOff className="h-4 w-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() =>
-                              setConfirm({ kind: "delete", user: u })
-                            }
-                            disabled={isMe || isSuper}
-                            className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-500"
-                            title={
-                              isSuper
-                                ? "Cannot delete a super admin"
-                                : isMe
-                                  ? "Cannot delete yourself"
-                                  : "Delete user"
-                            }
-                            aria-label="Delete user"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                        <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                          <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                          <span className="truncate">{u.email}</span>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                          <SchoolIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                          <span className="truncate">{u.school || "—"}</span>
+                        </div>
+                      </div>
+                      <RoleBadge
+                        isAdmin={u.is_admin}
+                        isSuper={u.is_super_admin}
+                      />
+                    </div>
+                    
+                    {/* Mobile Actions Bar */}
+                    <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                      <RowActions
+                        u={u}
+                        isMe={isMe}
+                        isSuper={isSuper}
+                        tab={tab}
+                        setConfirm={setConfirm}
+                        isMobile
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
@@ -422,6 +440,70 @@ export default function SuperAdminPage() {
         />
       )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Row Actions (Shared between Table & Mobile Cards)                 */
+/* ------------------------------------------------------------------ */
+
+function RowActions({
+  u,
+  isMe,
+  isSuper,
+  tab,
+  setConfirm,
+  isMobile = false,
+}: {
+  u: UserRow;
+  isMe: boolean;
+  isSuper: boolean;
+  tab: Tab;
+  setConfirm: (c: ConfirmState) => void;
+  isMobile?: boolean;
+}) {
+  const btnClass = `grid place-items-center rounded-lg transition active:scale-95 ${
+    isMobile ? "h-10 w-10" : "h-9 w-9"
+  }`;
+
+  return (
+    <>
+      {tab === "students" && (
+        <button
+          onClick={() => setConfirm({ kind: "promote", user: u })}
+          className={`${btnClass} text-slate-500 hover:bg-sky-50 hover:text-sky-600`}
+          title="Promote to admin"
+          aria-label="Promote to admin"
+        >
+          <UserCog className="h-4 w-4" />
+        </button>
+      )}
+      {tab === "admins" && !isSuper && !isMe && (
+        <button
+          onClick={() => setConfirm({ kind: "demote", user: u })}
+          className={`${btnClass} text-slate-500 hover:bg-amber-50 hover:text-amber-600`}
+          title="Demote to student"
+          aria-label="Demote to student"
+        >
+          <ShieldOff className="h-4 w-4" />
+        </button>
+      )}
+      <button
+        onClick={() => setConfirm({ kind: "delete", user: u })}
+        disabled={isMe || isSuper}
+        className={`${btnClass} text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-500`}
+        title={
+          isSuper
+            ? "Cannot delete a super admin"
+            : isMe
+              ? "Cannot delete yourself"
+              : "Delete user"
+        }
+        aria-label="Delete user"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </>
   );
 }
 
@@ -532,16 +614,17 @@ function ConfirmDialog({
           </div>
         </div>
 
-        <div className="mt-5 flex gap-2">
+        {/* Stacked on mobile */}
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
           <button
             onClick={onCancel}
-            className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
+            className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] sm:py-2.5"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className={`inline-flex flex-1 items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98] ${copy.ctaClass}`}
+            className={`inline-flex flex-1 items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98] sm:py-2.5 ${copy.ctaClass}`}
           >
             {copy.cta}
           </button>
@@ -603,7 +686,7 @@ function CreateAdminModal({
   }
 
   const inputBase =
-    "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100";
+    "w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:py-2.5";
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-3 backdrop-blur-sm sm:p-4">
@@ -713,18 +796,18 @@ function CreateAdminModal({
             </div>
           )}
 
-          <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+              className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:flex-none sm:py-2.5"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!valid || saving}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none sm:flex-none"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none sm:flex-none sm:py-2.5"
             >
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -825,7 +908,7 @@ function EmptyState({
       {isEmpty && isAdmins && (
         <button
           onClick={onAdd}
-          className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+          className="mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:w-auto sm:py-2.5"
         >
           <Plus className="h-4 w-4" /> Create first admin
         </button>

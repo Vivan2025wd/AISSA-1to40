@@ -82,16 +82,18 @@ export default function AdminGuard({
 
   if (state === "checking") {
     return (
-      <div className="grid min-h-screen place-items-center bg-slate-50 px-4">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <div className="relative grid h-14 w-14 place-items-center rounded-2xl bg-sky-50">
-            <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
+      <div className="grid min-h-dvh place-items-center bg-slate-50 px-4 py-6">
+        <div className="flex flex-col items-center gap-4 text-center">
+          {/* Pulsing spinner ring */}
+          <div className="relative grid h-16 w-16 place-items-center rounded-2xl bg-sky-50">
+            <span className="absolute inset-0 animate-ping rounded-2xl bg-sky-100 opacity-40" />
+            <Loader2 className="relative h-7 w-7 animate-spin text-sky-500" />
           </div>
           <div>
             <div className="text-sm font-semibold text-slate-800">
               Verifying admin access
             </div>
-            <div className="mt-0.5 text-xs text-slate-500">
+            <div className="mt-1 text-xs text-slate-500">
               This will only take a moment…
             </div>
           </div>
@@ -107,9 +109,10 @@ export default function AdminGuard({
     const Icon = isSessionExpired ? KeyRound : ShieldAlert;
 
     return (
-      <div className="grid min-h-screen place-items-center bg-linear-to-b from-sky-50 via-white to-slate-50 px-4 py-10">
+      <div className="grid min-h-dvh place-items-center bg-linear-to-b from-sky-50 via-white to-slate-50 px-4 py-10">
         <div className="w-full max-w-md">
-          <div className="rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm sm:p-8">
+          {/* Main card */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
             {/* Icon */}
             <div
               className={`mx-auto grid h-16 w-16 place-items-center rounded-2xl ${
@@ -122,7 +125,7 @@ export default function AdminGuard({
             </div>
 
             {/* Heading */}
-            <h1 className="mt-5 text-xl font-bold tracking-tight text-slate-900">
+            <h1 className="mt-5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
               {isSessionExpired ? "Session expired" : "Access denied"}
             </h1>
 
@@ -133,17 +136,17 @@ export default function AdminGuard({
                 : "This account doesn't have admin privileges."}
             </p>
 
-            {/* CTA */}
+            {/* CTA — full-width, larger tap target on mobile */}
             <button
               onClick={() => router.replace("/auth/login")}
-              className="mt-6 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98]"
+              className="mt-6 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 px-4 py-3.5 text-sm font-semibold text-white shadow-sm shadow-sky-500/25 transition hover:bg-sky-600 active:scale-[0.98] sm:py-3"
             >
               <ArrowLeft className="h-4 w-4" />
               {isSessionExpired ? "Sign in again" : "Back to sign in"}
             </button>
 
             {/* Secondary hint */}
-            <p className="mt-4 text-[11px] leading-relaxed text-slate-400">
+            <p className="mt-5 text-[11px] leading-relaxed text-slate-400">
               {isSessionExpired
                 ? "Tip: admin sessions end when the browser tab closes."
                 : "If you believe this is a mistake, contact a super admin."}
